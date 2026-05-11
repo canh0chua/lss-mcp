@@ -466,10 +466,10 @@ Report issues: https://github.com/canh0chua/lss-mcp/issues
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/canh0chua/8d895d16a150a9e9c5b0e8d1f7c7b7c7/raw/visitors.json" alt="visitors"/>
-  <img src="https://img.shields.io/badge/star%20history-0-5077B1?logo=github&logoColor=5077B1" alt="star-history"/>
-  <img src="https://img.shields.io/github/stars/canh0chua/lss-mcp" alt="GitHub stars"/>
-  <img src="https://img.shields.io/github/forks/canh0chua/lss-mcp" alt="GitHub forks"/>
-  <img src="https://img.shields.io/github/watchers/canh0chua/lss-mcp" alt="GitHub watchers"/>
-  <img src="https://img.shields.io/github/license/canh0chua/lss-mcp" alt="license"/>
+  <a href="https://github.com/canh0chua/lss-mcp/stargazers"><img src="https://img.shields.io/github/stars/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub stars"/></a>
+  <a href="https://github.com/canh0chua/lss-mcp/network"><img src="https://img.shields.io/github/forks/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub forks"/></a>
+  <a href="https://github.com/canh0chua/lss-mcp/watchers"><img src="https://img.shields.io/github/watchers/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub watchers"/></a>
+  <a href="https://github.com/canh0chua/lss-mcp"><img src="https://img.shields.io/github/license/canh0chua/lss-mcp?style=for-the-badge" alt="license"/></a>
+  <br/>
+  <a href="https://star-history.com/#canh0chua/lss-mcp"><img src="https://api.star-history.com/svg?type=svg&repo=canh0chua/lss-mcp" alt="Star History Chart" /></a>
 </p>
