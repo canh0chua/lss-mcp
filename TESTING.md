@@ -57,7 +57,7 @@ echo "# Test Document\n\nThis is a **markdown** test file." > workspace/test.md
 Then ask:
 
 ```
-Use the read_document tool to read "/workspace/test.md"
+Use the read_document tool to read "test.md"
 ```
 
 Expected result: The Markdown content of the file.
@@ -104,59 +104,59 @@ Run these commands through your AI assistant:
    ```
 
 3. **Parse a local PDF** (if you placed one):
-   ```
-   read_document("/workspace/test.pdf")
-   ```
+    ```
+    read_document("test.pdf")
+    ```
 
 4. **Outline a Python file:**
-   ```
-   read_code_outline("/workspace/sample_code.py")
-   ```
+    ```
+    read_code_outline("sample_code.py")
+    ```
 
 5. **Search the codebase:**
-   ```
-   search_codebase("hello_world")
-   ```
-
-  6. **Map repository:**
-     ```
-     map_repository("/workspace")
-     ```
-
-  7. **Find files with focused glob:**
-     ```
-     focused_glob("**/*.py", "/workspace")
-     ```
-
-  8. **Search code with context:**
-     ```
-     smart_code_search("def main")
-     ```
-
-  9. **Read file skeleton:**
-     ```
-     read_file_skeleton("/workspace/sample_code.py")
-     ```
-
- 10. **Read specific lines:**
-     ```
-     read_lines("/workspace/sample_code.py", 1, 10)
-     ```
-
- 7. **Run a safe command:**
     ```
-    run_command_compressed("ls -la /workspace")
+    search_codebase("hello_world")
     ```
 
- 8. **Read a large file safely:**
-    ```
-    safe_read_file("/workspace/sample_code.py")
-    ```
+   6. **Map repository:**
+      ```
+      map_repository()
+      ```
 
- 9. **Test image compression** (if you have an image file):
-    ```
-    compress_and_read_image("/workspace/test-image.png")
-    ```
+   7. **Find files with focused glob:**
+      ```
+      focused_glob("**/*.py")
+      ```
+
+   8. **Search code with context:**
+      ```
+      smart_code_search("def main")
+      ```
+
+   9. **Read file skeleton:**
+      ```
+      read_file_skeleton("sample_code.py")
+      ```
+
+  10. **Read specific lines:**
+      ```
+      read_lines("sample_code.py", 1, 10)
+```
+
+  7. **Run a safe command:**
+     ```
+     run_command_compressed("ls -la")
+     ```
+
+  8. **Read a large file safely:**
+     ```
+     safe_read_file("sample_code.py")
+     ```
+
+  9. **Test image compression** (if you have an image file):
+     ```
+     compress_and_read_image("test-image.png")
+     ```
 
 ## Troubleshooting
 
@@ -180,8 +180,8 @@ Run these commands through your AI assistant:
 
 ### "File not found"
 
-- Files must be inside the mounted `workspace/` directory
-- Use absolute paths starting with `/workspace/`
+- Files must be inside the workspace directory
+- Use absolute paths (`/workspace/file.pdf`) or relative paths (`file.pdf`) relative to workspace root
 - Verify mount is working: `docker exec lss-mcp_support_server ls /workspace`
 
 ### Container not starting

@@ -198,7 +198,7 @@ Parse documents into optimized Markdown. Supports local files and URLs with cach
 
 **Example:**
 ```
-read_document("/workspace/documents/report.pdf")
+read_document("documents/report.pdf")
 read_document("https://example.com/image.png")
 read_document("https://example.com/audio.mp3")
 ```
@@ -210,13 +210,13 @@ Returns ONLY the function and class signatures of a Python file. Use this BEFORE
 ```
 
 **Parameters:**
-- `file_path` (string): Absolute path to Python file
+- `file_path` (string): Absolute or relative path to Python file (relative to workspace)
 
 **Returns:** List of function and class signatures
 
 **Example:**
 ```
-read_code_outline("/workspace/project/main.py")
+read_code_outline("project/main.py")
 ```
 
 ### run_command_compressed
@@ -248,7 +248,7 @@ Resizes and compresses large UI screenshots before analysis to save vision token
 
 **Example:**
 ```
-compress_and_read_image("/workspace/screenshots/ui.png")
+compress_and_read_image("screenshots/ui.png")
 ```
 
 ### map_repository
@@ -265,8 +265,8 @@ Token-optimized repository mapper with .gitignore support and configurable depth
 
 **Example:**
 ```
-map_repository("/workspace")
-map_repository("/workspace", max_depth=2)
+map_repository()  # defaults to workspace root
+map_repository(max_depth=2)
 ```
 
 ### focused_glob
@@ -284,7 +284,7 @@ Finds files matching a pattern. Auto-filters .gitignore, common junk, and caps r
 
 **Example:**
 ```
-focused_glob("**/*.py", "/workspace")
+focused_glob("**/*.py")
 focused_glob("src/**/*.ts", limit=20)
 ```
 
@@ -319,7 +319,7 @@ Extracts only imports, functions, classes, and types from a file. ALWAYS use BEF
 
 **Example:**
 ```
-read_file_skeleton("/workspace/app/main.py")
+read_file_skeleton("app/main.py")
 ```
 
 ### read_lines
@@ -337,8 +337,8 @@ Reads a specific line range from a file. Use after read_file_skeleton to extract
 
 **Example:**
 ```
-read_lines("/workspace/app/main.py", 1, 50)
-read_lines("/workspace/utils.js", 100, 150)
+read_lines("app/main.py", 1, 50)
+read_lines("utils.js", 100, 150)
 ```
 
 ### search_codebase
@@ -373,13 +373,37 @@ Protected file reading with size checks to prevent accidental massive file loads
 
 **Example:**
 ```
-safe_read_file("/workspace/utils.js")
-safe_read_file("/workspace/large_file.py", force=True)
+safe_read_file("utils.js")
+safe_read_file("large_file.py", force=True)
 ```
 
 ## File Structure
 
 ```
+lss-mcp/
+├── docker-compose.yml
+├── Dockerfile
+├── server.py
+├── workspace/           # Mount your local files here (default)
+└── searxng-data/       # SearXNG configuration (auto-created)
+```
+
+## Workspace Mounting
+
+Place files you want to parse in the `workspace/` directory. The Docker container mounts this to `/workspace` inside the container, which is the default workspace root.
+
+**All file path parameters accept:**
+- **Absolute paths** (e.g., `/workspace/myfile.pdf`)
+- **Relative paths** (e.g., `myfile.pdf`, `docs/report.pdf`) - these are resolved relative to the workspace root
+
+To change the mounted directory, edit `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ./your-local-path:/workspace
+```
+
+Or override the workspace path by setting the `WORKSPACE` environment variable in `docker-compose.yml`.
 lss-mcp/
 ├── docker-compose.yml
 ├── Dockerfile
@@ -390,14 +414,27 @@ lss-mcp/
 
 ## Workspace Mounting
 
-Place files you want to parse in the `workspace/` directory. The Docker container mounts this to `/workspace`, so use absolute paths like `/workspace/myfile.pdf` with `read_document`.
+**Workspace Configuration:**
+
+The MCP server's workspace defaults to the current working directory (the directory containing `docker-compose.yml`) when run directly, or the path specified by the `WORKSPACE` environment variable.
+
+In the Docker setup:
+- The `./workspace` directory on the host is mounted to `/workspace` inside the container
+- By default, tools use `/workspace` as the workspace root (set via `WORKSPACE=/workspace` environment variable in `docker-compose.yml`)
+- You can use either absolute paths (`/workspace/myfile.pdf`) or relative paths (`myfile.pdf`) when calling tools
 
 To change the mounted directory, edit `docker-compose.yml`:
 
 ```yaml
 volumes:
-  - ./your-path:/workspace
+  - ./your-local-path:/workspace
 ```
+
+Or override the workspace by changing the `WORKSPACE` environment variable.
+
+**All tools that accept file paths now support:**
+- Absolute paths (e.g., `/workspace/project/main.py`)
+- Relative paths (e.g., `src/main.py`, `./config.yaml`) which are resolved relative to the workspace root
 
 ## Ports
 
@@ -428,8 +465,8 @@ docker logs -f lss-mcp_support_server
 - Check logs: `docker logs lss-mcp_support_server`
 
 ### "File not found"
-- File must be inside the mounted `workspace/` directory
-- Use absolute path starting with `/workspace/`
+- File must be inside the workspace directory
+- Use absolute path (e.g., `/workspace/file.pdf`) or relative path (e.g., `file.pdf`) relative to workspace root
 
 ### Container keeps restarting
 - Check logs: `docker logs lss-mcp_support_server`
