@@ -532,6 +532,28 @@ docker compose down -v  # Also remove volumes
 
 ## Advanced Configuration
 
+### Corporate Proxy / Custom CA Certificates
+
+If your network uses a MITM proxy (e.g., Zscaler, Netskope, Palo Alto), you need to add the proxy's CA certificate so the Docker containers can make HTTPS requests.
+
+1. Place your `.crt` file(s) in the `certs/` directory:
+   ```bash
+   cp /path/to/your-proxy-ca.crt certs/
+   ```
+
+2. Rebuild:
+   ```bash
+   docker compose up -d --build
+   ```
+
+That's it. The certificates are automatically trusted by:
+- Python (`requests`, `httpx`, `urllib`) via `SSL_CERT_FILE`
+- Playwright/Chromium via `NODE_EXTRA_CA_CERTS`
+- SearXNG's outbound search queries via `REQUESTS_CA_BUNDLE`
+- All system-level TLS via `update-ca-certificates`
+
+The `certs/` directory is gitignored — your certificates stay local.
+
 ### Custom SearXNG Settings
 
 SearXNG configuration lives in `./searxng-data`. Edit `searxng/settings.yml` inside that directory to customize:

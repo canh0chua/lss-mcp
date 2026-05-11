@@ -37,3 +37,7 @@ debug_server.py
 # OS
 .DS_Store
 Thumbs.db
+
+# Custom CA certificates (user-provided, not committed)
+certs/*.crt
+certs/*.pem

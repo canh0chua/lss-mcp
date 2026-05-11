@@ -7,11 +7,14 @@ services:
     volumes:
       - ./searxng-data:/etc/searxng
       - ./logs/searxng:/var/log/searxng
+      - ./certs:/usr/local/share/ca-certificates/custom:ro
     environment:
       - SEARXNG_BASE_URL=http://localhost:8080/
       - SEARXNG_URL_FORMAT=json
       - SEARXNG_LIMITER=false
       - SEARXNG_PUBLIC_INSTANCE=false
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    command: ["/bin/sh", "-c", "update-ca-certificates 2>/dev/null; /usr/local/searxng/dockerfiles/docker-entrypoint.sh"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz').read().decode()"]
