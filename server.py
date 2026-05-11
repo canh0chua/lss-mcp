@@ -26,8 +26,8 @@ mcp = FastMCP("Local_AI_Support_Stack")
 # ---------------------------------------------------------------------------
 
 # Allowed root directory for all local file access.
-# Set WORKSPACE env var to override; defaults to /workspace.
-_WORKSPACE = os.path.realpath(os.getenv("WORKSPACE", "/workspace"))
+# Set WORKSPACE env var to override; defaults to current working directory.
+_WORKSPACE = os.path.realpath(os.getenv("WORKSPACE", os.getcwd()))
 
 # Sensitive file patterns that should never be read or indexed.
 _SENSITIVE_PATTERNS = (
@@ -388,7 +388,9 @@ def compress_and_read_image(image_path: str) -> str:
 
 
 @mcp.tool()
-def map_repository(directory: str = "/workspace", max_depth: int = 3) -> str:
+def map_repository(directory: str = None, max_depth: int = 3) -> str:
+    if directory is None:
+        directory = _WORKSPACE
     """Always use this instead of 'ls' or 'tree' to understand the project structure."""
     if len(directory) > _MAX_PATH_LEN:
         return f"Error: directory path exceeds maximum allowed length."
@@ -458,11 +460,15 @@ def smart_code_search(keyword: str, file_pattern: str = "*.*") -> str:
         # Use ripgrep if available (faster), fallback to grep
         import shutil
         rg_path = shutil.which('rg')
+        workspace = _WORKSPACE
+        # Ensure workspace has trailing slash for replacement
+        workspace_prefix = workspace if workspace.endswith(os.sep) else workspace + os.sep
+
         if rg_path:
             # -C 2: 2 lines of context, -n: show line numbers, --no-heading: cleaner output
-            cmd = f'rg -C 2 -n --no-heading --type-add "search:*" --include "{file_pattern}" "{keyword}" /workspace | head -n 100'
+            cmd = f'rg -C 2 -n --no-heading --type-add "search:*" --include "{file_pattern}" "{keyword}" "{workspace}" | head -n 100'
         else:
-            cmd = f'grep -rn -C 2 --include="{file_pattern}" "{keyword}" /workspace 2>/dev/null | head -n 100'
+            cmd = f'grep -rn -C 2 --include="{file_pattern}" "{keyword}" "{workspace}" 2>/dev/null | head -n 100'
 
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
@@ -477,8 +483,8 @@ def smart_code_search(keyword: str, file_pattern: str = "*.*") -> str:
             if line == "--":  # Grep's context separator
                 compressed_results.append("---")
             else:
-                # Remove the /workspace/ prefix for brevity
-                compressed_results.append(line.replace('/workspace/', ''))
+                # Remove the workspace prefix for brevity
+                compressed_results.append(line.replace(workspace_prefix, ''))
 
         # Hard limit the return payload to ~2000 tokens
         final_text = "\n".join(compressed_results)
@@ -537,7 +543,9 @@ def read_file_skeleton(file_path: str) -> str:
 
 
 @mcp.tool()
-def focused_glob(pattern: str, directory: str = "/workspace", limit: int = 50) -> str:
+def focused_glob(pattern: str, directory: str = None, limit: int = 50) -> str:
+    if directory is None:
+        directory = _WORKSPACE
     """Finds files matching a pattern. Automatically filters junk and caps results to save tokens."""
     try:
         if len(directory) > _MAX_PATH_LEN:
@@ -639,7 +647,8 @@ def _init_fts_db(db_path: str = "/tmp/code_fts.db") -> str:
     - Only indexes files with allowlisted extensions.
     - Skips sensitive files.
     """
-    workspace = os.path.realpath(os.getenv("WORKSPACE", "/workspace"))
+    workspace = _WORKSPACE
+    workspace_prefix = workspace if workspace.endswith(os.sep) else workspace + os.sep
     ignore_dirs = {".git", "node_modules", "venv", "__pycache__", ".venv"}
 
     conn = sqlite3.connect(db_path, check_same_thread=False)
