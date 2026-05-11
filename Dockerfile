@@ -21,4 +21,4 @@ RUN playwright install --with-deps chromium
 
 COPY server.py .
 
-CMD ["python", "/app/server.py"]
+ENTRYPOINT ["python", "/app/server.py"]

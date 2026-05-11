@@ -1,6 +1,7 @@
 import os
 import tempfile
 import ast
+from pathlib import Path
 import subprocess
 import io
 import base64
@@ -26,8 +27,8 @@ mcp = FastMCP("Local_AI_Support_Stack")
 # ---------------------------------------------------------------------------
 
 # Allowed root directory for all local file access.
-# Set WORKSPACE env var to override; defaults to current working directory.
-_WORKSPACE = os.path.realpath(os.getenv("WORKSPACE", os.getcwd()))
+# Set WORKSPACE env var to override; falls back to ~/workspace for cross-platform local dev.
+_WORKSPACE = os.path.realpath(os.environ.get("WORKSPACE", str(Path.home() / "workspace")))
 
 # Sensitive file patterns that should never be read or indexed.
 _SENSITIVE_PATTERNS = (
