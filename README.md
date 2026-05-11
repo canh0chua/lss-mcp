@@ -1,10 +1,3 @@
-[![visitors](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/canh0chua/8d895d16a150a9e9c5b0e8d1f7c7b7c7/raw/visitors.json)](https://github.com/canh0chua/lss-mcp)
-[![star-history](https://img.shields.io/badge/star%20history-0-5077B1?logo=github&logoColor=5077B1&style=for-the-badge)](https://github.com/canh0chua/lss-mcp/stargazers)
-[![GitHub stars](https://img.shields.io/github/stars/canh0chua/lss-mcp?style=for-the-badge)](https://github.com/canh0chua/lss-mcp/stargazer)
-[![GitHub forks](https://img.shields.io/github/forks/canh0chua/lss-mcp?style=for-the-badge)](https://github.com/canh0chua/lss-mcp/network)
-[![GitHub watchers](https://img.shields.io/github/watchers/canh0chua/lss-mcp?style=for-the-badge)](https://github.com/canh0chua/lss-mcp/watchers)
-[![license](https://img.shields.io/github/license/canh0chua/lss-mcp?style=for-the-badge)](https://github.com/canh0chua/lss-mcp/blob/main/LICENSE)
-
 # LSS-MCP (Local Support Stack MCP)
 
 Self-hosted Docker stack that exposes a single MCP server to Claude Code and other AI coding assistants. Offloads web searching, JS-heavy scraping, and PDF/document parsing to local open-source tools (SearXNG, Crawl4AI, Docling) to provide clean Markdown, saving roughly 80% to 90% on Anthropic API token costs.
@@ -465,10 +458,18 @@ Compared to using ChatGPT Pro or Claude AI directly with web search/reasoning:
 - **With LSS-MCP**: ~500 tokens (compact JSON) + minimal Markdown
 - **Savings**: 80-90% on token costs
 
-## License
-
-MIT
 
 ## Support
 
 Report issues: https://github.com/canh0chua/lss-mcp/issues
+
+---
+
+<p align="center">
+  <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/canh0chua/8d895d16a150a9e9c5b0e8d1f7c7b7c7/raw/visitors.json" alt="visitors"/>
+  <img src="https://img.shields.io/badge/star%20history-0-5077B1?logo=github&logoColor=5077B1" alt="star-history"/>
+  <img src="https://img.shields.io/github/stars/canh0chua/lss-mcp" alt="GitHub stars"/>
+  <img src="https://img.shields.io/github/forks/canh0chua/lss-mcp" alt="GitHub forks"/>
+  <img src="https://img.shields.io/github/watchers/canh0chua/lss-mcp" alt="GitHub watchers"/>
+  <img src="https://img.shields.io/github/license/canh0chua/lss-mcp" alt="license"/>
+</p>
