@@ -1,6 +1,6 @@
 # LSS-MCP (Local Support Stack MCP)
 
-Self-hosted Docker stack that exposes a single MCP server to Claude Code and other AI coding assistants. Offloads web searching, JS-heavy scraping, and PDF/document parsing to local open-source tools (SearXNG, Crawl4AI, Docling) to provide clean Markdown, saving roughly 80% to 90% on Anthropic API token costs.
+Self-hosted Docker stack that exposes a single MCP server to Claude Code and other AI coding assistants. Offloads web searching, JS-heavy scraping, and PDF/document parsing to local open-source tools (SearXNG, Crawl4AI, Docling) to provide clean Markdown, saving roughly 80% to 90% on API token costs.
 
 ## Features
 
@@ -54,7 +54,7 @@ Despite the optimized version having more total tokens (due to caching), the act
 | File navigation | Targeted searches | Multiple full reads | **85%+** |
 | Code reading | Skeleton + specific lines | Full file contents | **80%+** |
 
-**Overall: 80-90% reduction** in Anthropic API token costs for typical development workflows.
+**Overall: 80-90% reduction** in API token costs for typical development workflows.
 
 ## Quick Start
 
