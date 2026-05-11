@@ -80,6 +80,37 @@ Before modifying any MCP settings, **always consult the official documentation f
 
 The configurations below are examples. Refer to your agent's current documentation for the most accurate setup instructions.
 
+### OpenCode
+
+Add the following to your `opencode.json` or `opencode.jsonc` configuration file:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "local-support-stack": {
+      "type": "local",
+      "command": ["docker", "exec", "-i", "lss-mcp_support_server", "python", "/app/server.py"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Restart OpenCode to load the MCP server. All LSS-MCP tools will be available automatically. You can optionally control tool access via the `tools` configuration:
+
+```json
+{
+  "tools": {
+    "local-support-stack_*": true
+  }
+}
+```
+
+Use tools by mentioning them in your prompts, e.g., `use web_search` or `use read_document`.
+
+For more details on MCP server configuration, see the [OpenCode MCP documentation](https://opencode.ai/docs/mcp-servers/).
+
 ### Claude Code
 
 ```bash
