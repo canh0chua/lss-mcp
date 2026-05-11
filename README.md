@@ -28,6 +28,22 @@ Below are real screenshots showing the dramatic token reduction when using LSS-M
 ![Without LSS-MCP](without-lss-mcp.png)
 *Without LSS-MCP: Verbose, token-heavy responses (full content)*
 
+**With LSS-MCP (Optimized)** - Total: 60,198 tokens
+
+- Input: 2,172 tokens
+- Cached Input: 57,344 tokens
+- Output + Reasoning: 682 tokens
+- **Total Cost: $0.0090**
+
+**Without LSS-MCP (Standard)** - Total: 29,234 tokens
+
+- Input: 10,500 tokens
+- Cached Input: 17,920 tokens
+- Output + Reasoning: 814 tokens
+- **Total Cost: $0.0129**
+
+Despite the optimized version having more total tokens (due to caching), the actual cost is **30% lower** ($0.0090 vs $0.0129) because cached input tokens are significantly cheaper ($0.075/1M vs $0.75/1M). The optimization strategy trades token quantity for cost efficiency by maximizing cache reuse.
+
 ### Quantitative Comparison
 
 | Metric | With LSS-MCP | Without LSS-MCP | Savings |
