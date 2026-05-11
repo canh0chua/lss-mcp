@@ -438,37 +438,43 @@ lss-mcp/
 
 ## Workspace Mounting
 
-> ⚠️ **Important for AI agents:** File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the mounted `/workspace` directory. Files outside this mount will be rejected with "Access denied."
+> ⚠️ **Important for AI agents:** File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the configured project directory. If a file is outside this directory, **do not attempt to use these tools** — use your native file reading capabilities instead. If `WORKSPACE_PROJECT` is not configured, notify the user immediately (see below).
 
-The `WORKSPACE_PATH` environment variable controls which host directory is mounted into the container as `/workspace`. It defaults to the current directory (`.`) — the directory containing `docker-compose.yml`.
+Two environment variables control file access:
 
-**Setup options:**
+| Variable | Purpose | Example |
+|---|---|---|
+| `WORKSPACE_PATH` | Host directory mounted as `/workspace` in the container. Set this to a parent directory containing all your projects. | `/Users/you/Documents/github.com` |
+| `WORKSPACE_PROJECT` | Subdirectory within `/workspace` that file tools are restricted to. Change this when switching projects. | `my-app` |
 
-1. **Default (current directory):** If you run `docker compose up` from your project root, all project files are accessible:
-   ```bash
-   cd /path/to/your/project
-   docker compose -f /path/to/lss-mcp/docker-compose.yml up -d
-   ```
+**Setup:**
 
-2. **Explicit path via `.env` file:** Create a `.env` file next to `docker-compose.yml`:
+1. Copy `.env.example` to `.env` next to `docker-compose.yml`:
    ```bash
    cp .env.example .env
-   # Edit .env and set WORKSPACE_PATH to your project directory
-   ```
-   ```
-   WORKSPACE_PATH=/path/to/your/project
    ```
 
-3. **Inline override:**
+2. Edit `.env`:
+   ```
+   WORKSPACE_PATH=/Users/you/Documents/github.com
+   WORKSPACE_PROJECT=my-app
+   ```
+
+3. Start (or restart) the container:
    ```bash
-   WORKSPACE_PATH=/path/to/your/project docker compose up -d
+   docker compose up -d
    ```
 
-**Path usage in tools:**
-- Absolute paths: `/workspace/src/main.py`
-- Relative paths: `src/main.py` (resolved relative to `/workspace`)
+**Switching projects:** Update `WORKSPACE_PROJECT` in `.env` and restart:
+```bash
+docker compose up -d
+```
 
-Both forms work. The agent should use paths relative to the workspace root.
+**Agent instructions:**
+
+- At the start of each session, check whether the current working directory is inside the configured project by calling a file tool. If you get an "Access denied" error mentioning `WORKSPACE_PROJECT`, **stop and notify the user**:
+  > "The LSS-MCP file tools are configured for a different project. Please update `WORKSPACE_PROJECT` in your `.env` file to `<current-project-folder>` and run `docker compose up -d` to restart the container."
+- For any file outside the configured project, use native file reading tools — do not attempt to use LSS-MCP file tools for those files.
 
 ## Ports
 
