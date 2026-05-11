@@ -33,7 +33,7 @@ services:
     container_name: lss-mcp_support_server
     network_mode: service:searxng
     volumes:
-      - ./workspace:/workspace
+      - ${WORKSPACE_PATH:-.}:/workspace
       - ./logs/mcp-server:/var/log/mcp-server
     environment:
       - SEARXNG_URL=http://localhost:8080

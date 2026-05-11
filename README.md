@@ -431,57 +431,44 @@ lss-mcp/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── server.py
-├── workspace/           # Mount your local files here (default)
+├── .env.example        # Workspace path configuration
+├── certs/              # Custom CA certificates (optional)
 └── searxng-data/       # SearXNG configuration (auto-created)
 ```
 
 ## Workspace Mounting
 
-Place files you want to parse in the `workspace/` directory. The Docker container mounts this to `/workspace` inside the container, which is the default workspace root.
+> ⚠️ **Important for AI agents:** File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the mounted `/workspace` directory. Files outside this mount will be rejected with "Access denied."
 
-**All file path parameters accept:**
-- **Absolute paths** (e.g., `/workspace/myfile.pdf`)
-- **Relative paths** (e.g., `myfile.pdf`, `docs/report.pdf`) - these are resolved relative to the workspace root
+The `WORKSPACE_PATH` environment variable controls which host directory is mounted into the container as `/workspace`. It defaults to the current directory (`.`) — the directory containing `docker-compose.yml`.
 
-To change the mounted directory, edit `docker-compose.yml`:
+**Setup options:**
 
-```yaml
-volumes:
-  - ./your-local-path:/workspace
-```
+1. **Default (current directory):** If you run `docker compose up` from your project root, all project files are accessible:
+   ```bash
+   cd /path/to/your/project
+   docker compose -f /path/to/lss-mcp/docker-compose.yml up -d
+   ```
 
-Or override the workspace path by setting the `WORKSPACE` environment variable in `docker-compose.yml`.
-lss-mcp/
-├── docker-compose.yml
-├── Dockerfile
-├── server.py
-├── workspace/           # Mount your local files here
-└── searxng-data/       # SearXNG configuration (auto-created)
-```
+2. **Explicit path via `.env` file:** Create a `.env` file next to `docker-compose.yml`:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set WORKSPACE_PATH to your project directory
+   ```
+   ```
+   WORKSPACE_PATH=/path/to/your/project
+   ```
 
-## Workspace Mounting
+3. **Inline override:**
+   ```bash
+   WORKSPACE_PATH=/path/to/your/project docker compose up -d
+   ```
 
-**Workspace Configuration:**
+**Path usage in tools:**
+- Absolute paths: `/workspace/src/main.py`
+- Relative paths: `src/main.py` (resolved relative to `/workspace`)
 
-The MCP server's workspace defaults to the current working directory (the directory containing `docker-compose.yml`) when run directly, or the path specified by the `WORKSPACE` environment variable.
-
-In the Docker setup:
-- The `./workspace` directory on the host is mounted to `/workspace` inside the container
-- By default, tools use `/workspace` as the workspace root (set via `WORKSPACE=/workspace` environment variable in `docker-compose.yml`)
-- You can use either absolute paths (`/workspace/myfile.pdf`) or relative paths (`myfile.pdf`) when calling tools
-
-To change the mounted directory, edit `docker-compose.yml`:
-
-```yaml
-volumes:
-  - ./your-local-path:/workspace
-```
-
-Or override the workspace by changing the `WORKSPACE` environment variable.
-
-**All tools that accept file paths now support:**
-- Absolute paths (e.g., `/workspace/project/main.py`)
-- Relative paths (e.g., `src/main.py`, `./config.yaml`) which are resolved relative to the workspace root
+Both forms work. The agent should use paths relative to the workspace root.
 
 ## Ports
 
