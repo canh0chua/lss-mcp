@@ -21,4 +21,4 @@ RUN playwright install --with-deps chromium
 
 COPY server.py .
 
-CMD ["tail", "-f", "/dev/null"]
+CMD ["python", "/app/server.py"]
