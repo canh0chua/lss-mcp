@@ -74,122 +74,11 @@ Despite the optimized version having more total tokens (due to caching), the act
 
 ## Connecting AI Coding Assistants
 
-### Important: Check Your Agent's Documentation First
-
-Before modifying any MCP settings, **always consult the official documentation for your specific AI coding assistant**. MCP configuration formats and procedures vary between agents (Claude Code, Cursor, Windsurf, etc.) and may change over version updates.
-
-The configurations below are examples. Refer to your agent's current documentation for the most accurate setup instructions.
-
-### OpenCode
-
-Add the following to your `opencode.json` or `opencode.jsonc` configuration file:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "local-support-stack": {
-      "type": "local",
-      "command": ["docker", "exec", "-i", "lss-mcp_support_server", "python", "/app/server.py"],
-      "enabled": true
-    }
-  }
-}
-```
-
-Restart OpenCode to load the MCP server. All LSS-MCP tools will be available automatically. You can optionally control tool access via the `tools` configuration:
-
-```json
-{
-  "tools": {
-    "local-support-stack_*": true
-  }
-}
-```
-
-Use tools by mentioning them in your prompts, e.g., `use web_search` or `use read_document`.
-
-For more details on MCP server configuration, see the [OpenCode MCP documentation](https://opencode.ai/docs/mcp-servers/).
-
-### Claude Code
-
-```bash
-claude mcp add local-support-stack -- docker exec -i lss-mcp_support_server python /app/server.py
-```
-
-Then restart your Claude Code session. Use tools: `web_search`, `read_webpage`, `read_document`, `read_code_outline`, `run_command_compressed`, `compress_and_read_image`, `map_repository`, `focused_glob`, `smart_code_search`, `read_file_skeleton`, `read_lines`, `search_codebase`, `safe_read_file`.
-
-### Cursor IDE
-
-1. Open Cursor Settings (Cmd+,)
-2. Search "MCP Server"
-3. Click "Add New Server"
-4. Configuration:
-   - **Name**: Local Support Stack
-   - **Command**: `docker`
-    - **Arguments**: `exec -i lss-mcp_support_server python /app/server.py`
-5. Save and reload Cursor
-
-### Windsurf
-
-1. Open command palette (Cmd+Shift+P)
-2. "Windsurf: Add MCP Server"
-3. Enter:
-   - Name: `local-support-stack`
-   -     Command: `docker exec -i lss-mcp_support_server python /app/server.py`
-4. Restart Windsurf
-
-### Continue (VS Code Extension)
-
-Add to VS Code settings.json or `.continue/config.json`:
-
-```json
-{
-  "mcpServers": {
-    "local-support-stack": {
-      "command": "docker",
-        "args": ["exec", "-i", "lss-mcp_support_server", "python", "/app/server.py"]
-    }
-  }
-}
-```
-
-### Zed Editor
-
-1. Open Settings (Cmd+,)
-2. Search "MCP"
-3. Add to `mcp_servers`:
-   ```json
-   {
-     "local-support-stack": {
-       "command": "docker",
-      "args": ["exec", "-i", "lss-mcp_support_server", "python", "/app/server.py"]
-     }
-   }
-   ```
-4. Restart Zed
-
-### Generic MCP Clients
-
-For any MCP-compatible client, use this connection command:
-
-```
-docker exec -i lss-mcp_support_server python /app/server.py
-```
-
-Ensure the client uses stdio transport.
-
-## Post-Setup Verification (Optional)
-
-**⚠️ Token Cost Warning:** Running the full test suite consumes tokens. Testing is optional but recommended to verify integration.
-
-Before running tests, the AI assistant should ask the user for confirmation:
-
-> "Would you like me to run verification tests to ensure everything is working? This will test all tools and consume some tokens."
-
-If the user agrees, follow the [TESTING.md](TESTING.md) guide to verify all tools are working correctly. This ensures proper integration and helps diagnose any issues before regular use.
+See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, and other MCP clients.
 
 ## Using the Tools
+
+See [TOOLS.md](TOOLS.md) for complete tool reference with parameters and examples.
 
 ### web_search
 
@@ -431,57 +320,119 @@ lss-mcp/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── server.py
-├── workspace/           # Mount your local files here (default)
+├── .env.example        # Workspace path configuration
+├── certs/              # Custom CA certificates (optional)
 └── searxng-data/       # SearXNG configuration (auto-created)
 ```
 
 ## Workspace Mounting
 
-Place files you want to parse in the `workspace/` directory. The Docker container mounts this to `/workspace` inside the container, which is the default workspace root.
+> ⚠️ **Important for AI agents:** File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the configured project directory. If a file is outside this directory, **do not attempt to use these tools** — use your native file reading capabilities instead. If `WORKSPACE_PROJECT` is not configured, notify the user immediately (see below).
 
-**All file path parameters accept:**
-- **Absolute paths** (e.g., `/workspace/myfile.pdf`)
-- **Relative paths** (e.g., `myfile.pdf`, `docs/report.pdf`) - these are resolved relative to the workspace root
+Two environment variables control file access:
 
-To change the mounted directory, edit `docker-compose.yml`:
+| Variable | Purpose | Example |
+|---|---|---|
+| `WORKSPACE_PATH` | Host directory mounted as `/workspace` in the container. Set this to a parent directory containing all your projects. | `/Users/you/Documents/github.com` |
+| `WORKSPACE_PROJECT` | Subdirectory within `/workspace` that file tools are restricted to. Change this when switching projects. | `my-app` |
+
+**Setup:**
+
+1. Copy `.env.example` to `.env` next to `docker-compose.yml`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env`:
+   ```
+   WORKSPACE_PATH=/Users/you/Documents/github.com
+   WORKSPACE_PROJECT=my-app
+   ```
+
+3. Start (or restart) the container:
+   ```bash
+   docker compose up -d
+   ```
+
+**Switching projects:** Update `WORKSPACE_PROJECT` in `.env` and restart:
+```bash
+docker compose up -d
+```
+
+**Agent instructions:**
+
+- At the start of each session, check whether the current working directory is inside the configured project by calling a file tool. If you get an "Access denied" error mentioning `WORKSPACE_PROJECT`, **stop and notify the user**:
+  > "The LSS-MCP file tools are configured for a different project. Please update `WORKSPACE_PROJECT` in your `.env` file to `<current-project-folder>` and run `docker compose up -d` to restart the container."
+- For any file outside the configured project, use native file reading tools — do not attempt to use LSS-MCP file tools for those files.
+
+## Security Model
+
+### Workspace Isolation
+
+LSS-MCP uses a **workspace isolation model** to prevent unauthorized file access. File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`, `focused_glob`, `map_repository`) can **only** access files inside the configured project directory.
+
+**How it works:**
+- `WORKSPACE_PATH`: Host directory mounted as `/workspace` in the container
+- `WORKSPACE_PROJECT`: Subdirectory within `/workspace` that file tools are restricted to
+- All file operations validate the path is within `/workspace/{WORKSPACE_PROJECT}`
+
+#### Security Advantages
+
+| Advantage | Description |
+|-----------|-------------|
+| **Path traversal prevention** | Explicitly blocks access outside configured project |
+| **No default root access** | Container cannot read arbitrary host files |
+| **Project isolation** | Each project has its own workspace - switch projects by updating `WORKSPACE_PROJECT` |
+| **Audit trail** | File access is logged with validation errors |
+| **No secrets exposure** | Sensitive files outside workspace are unreachable |
+
+#### Security Considerations
+
+| Risk | Mitigation |
+|------|------------|
+| **Misconfiguration** | If `WORKSPACE_PATH` points to `/` or `~`, all host files become accessible. Always use a specific project directory. |
+| **Symlink attacks** | Symbolic links pointing outside workspace are blocked by validation |
+| **Container escape** | Docker container isolation provides baseline security |
+| **Memory exposure** | No persistent secrets in container memory |
+
+#### Recommended Configuration
+
+```bash
+# .env - use specific project directory, NOT home or root
+WORKSPACE_PATH=/Users/you/projects        # ✅ Specific directory
+WORKSPACE_PROJECT=my-app                  # ✅ Single project
+```
+
+```bash
+# ❌ Avoid these - exposes entire filesystem
+WORKSPACE_PATH=/
+WORKSPACE_PATH=~
+```
+
+### Bot Detection
+
+SearXNG includes bot detection that may block automated requests. Key configurations:
 
 ```yaml
-volumes:
-  - ./your-local-path:/workspace
+# searxng-data/settings.yml
+botdetection:
+  # Trusted proxies (needed for Docker networking)
+  trusted_proxies:
+    - '172.16.0.0/12'   # Docker networks
+    - '192.168.0.0/16'  # Private networks
+    - '10.0.0.0/8'      # Private networks
+
+  # IP lists (allow/block specific IPs)
+  pass_ip:
+    - '192.168.0.0/16'
+  block_ip: []
+
+  # Rate limiting (requires Valkey/Redis)
+  ip_limit:
+    link_token: false
 ```
 
-Or override the workspace path by setting the `WORKSPACE` environment variable in `docker-compose.yml`.
-lss-mcp/
-├── docker-compose.yml
-├── Dockerfile
-├── server.py
-├── workspace/           # Mount your local files here
-└── searxng-data/       # SearXNG configuration (auto-created)
-```
-
-## Workspace Mounting
-
-**Workspace Configuration:**
-
-The MCP server's workspace defaults to the current working directory (the directory containing `docker-compose.yml`) when run directly, or the path specified by the `WORKSPACE` environment variable.
-
-In the Docker setup:
-- The `./workspace` directory on the host is mounted to `/workspace` inside the container
-- By default, tools use `/workspace` as the workspace root (set via `WORKSPACE=/workspace` environment variable in `docker-compose.yml`)
-- You can use either absolute paths (`/workspace/myfile.pdf`) or relative paths (`myfile.pdf`) when calling tools
-
-To change the mounted directory, edit `docker-compose.yml`:
-
-```yaml
-volumes:
-  - ./your-local-path:/workspace
-```
-
-Or override the workspace by changing the `WORKSPACE` environment variable.
-
-**All tools that accept file paths now support:**
-- Absolute paths (e.g., `/workspace/project/main.py`)
-- Relative paths (e.g., `src/main.py`, `./config.yaml`) which are resolved relative to the workspace root
+**Note:** Rate limiting (`ip_limit`) requires a Valkey/Redis container. For local development, it's disabled by default.
 
 ## Ports
 
@@ -500,85 +451,36 @@ docker logs -f lss-mcp_searxng
 docker logs -f lss-mcp_support_server
 ```
 
+## Post-Setup Verification
+
+**⚠️ Token Cost Warning:** Running the full test suite consumes tokens. Testing is optional but recommended to verify integration.
+
+Before running tests, the AI assistant should ask the user for confirmation:
+
+> "Would you like me to run verification tests to ensure everything is working? This will test all tools and consume some tokens."
+
+If the user agrees, test the tools in this order:
+
+1. **web_search** - Test: `web_search("test query")`
+2. **read_webpage** - Test: `read_webpage("https://example.com")`
+3. **read_code_outline** - Test: `read_code_outline("server.py")`
+4. **run_command_compressed** - Test: `run_command_compressed("echo hello")`
+5. **read_file_skeleton** - Test: `read_file_skeleton("server.py")`
+
+All tools should return successful results. If any tool fails:
+- Check container status: `docker ps --filter "name=mcp_"`
+- Check logs: `docker logs lss-mcp_support_server`
+- Verify workspace path: File tools only work within `/workspace/{WORKSPACE_PROJECT}`
+
 ## Troubleshooting
 
-### "Search failed" error
-- Check SearXNG is running: `docker logs lss-mcp_searxng`
-- Wait 30 seconds after first startup for SearXNG to initialize
-- Port 8080 should be mapped: `docker ps` shows `0.0.0.0:8080->8080/tcp`
-
-### "Failed to fetch webpage"
-- Crawl4AI requires network access; ensure the container can reach the URL
-- Check logs: `docker logs lss-mcp_support_server`
-
-### "File not found"
-- File must be inside the workspace directory
-- Use absolute path (e.g., `/workspace/file.pdf`) or relative path (e.g., `file.pdf`) relative to workspace root
-
-### Container keeps restarting
-- Check logs: `docker logs lss-mcp_support_server`
-- Ensure Docker has enough memory (recommend 4GB+)
-
-### Slow builds
-- Docker build downloads ~2GB of dependencies on first run
-- Ensure stable internet connection
-- Build can take 5-15 minutes depending on network
-
-### Cleaning up
-```bash
-docker compose down
-docker compose down -v  # Also remove volumes
-```
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
 
 ## Advanced Configuration
 
-### Corporate Proxy / Custom CA Certificates
+See [ADVANCED.md](ADVANCED.md) for proxy settings, custom SearXNG config, timeouts, and resource limits.
 
-If your network uses a MITM proxy (e.g., Zscaler, Netskope, Palo Alto), you need to add the proxy's CA certificate so the Docker containers can make HTTPS requests.
-
-1. Place your `.crt` file(s) in the `certs/` directory:
-   ```bash
-   cp /path/to/your-proxy-ca.crt certs/
-   ```
-
-2. Rebuild:
-   ```bash
-   docker compose up -d --build
-   ```
-
-That's it. The certificates are automatically trusted by:
-- Python (`requests`, `httpx`, `urllib`) via `SSL_CERT_FILE`
-- Playwright/Chromium via `NODE_EXTRA_CA_CERTS`
-- SearXNG's outbound search queries via `REQUESTS_CA_BUNDLE`
-- All system-level TLS via `update-ca-certificates`
-
-The `certs/` directory is gitignored — your certificates stay local.
-
-### Custom SearXNG Settings
-
-SearXNG configuration lives in `./searxng-data`. Edit `searxng/settings.yml` inside that directory to customize:
-- Enable/disable engines
-- Add rate limits
-- Change UI settings
-
-After changes, restart: `docker compose restart searxng`
-
-### Increasing Timeouts
-
-Edit `server.py` to adjust timeout values (default 10s for search).
-
-### Resource Limits
-
-Add to `docker-compose.yml` under `mcp-server`:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 4G
-```
-
-## Support
+---
 
 Report issues: https://github.com/canh0chua/lss-mcp/issues
 

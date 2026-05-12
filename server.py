@@ -30,6 +30,18 @@ mcp = FastMCP("Local_AI_Support_Stack")
 # Set WORKSPACE env var to override; falls back to ~/workspace for cross-platform local dev.
 _WORKSPACE = os.path.realpath(os.environ.get("WORKSPACE", str(Path.home() / "workspace")))
 
+# Optional project-level restriction within _WORKSPACE.
+# When set, file tools are further restricted to this subdirectory.
+# Example: WORKSPACE_PROJECT=my-repo  →  only /workspace/my-repo/** is accessible.
+_WORKSPACE_PROJECT: str | None = None
+_raw_project = os.environ.get("WORKSPACE_PROJECT", "").strip()
+if _raw_project:
+    _candidate = os.path.realpath(os.path.join(_WORKSPACE, _raw_project))
+    if _candidate.startswith(_WORKSPACE + os.sep) or _candidate == _WORKSPACE:
+        _WORKSPACE_PROJECT = _candidate
+    else:
+        print(f"Warning: WORKSPACE_PROJECT '{_raw_project}' escapes workspace — ignored.")
+
 # Sensitive file patterns that should never be read or indexed.
 _SENSITIVE_PATTERNS = (
     ".env", ".pem", ".key", ".p12", ".pfx", ".crt", ".cer",
@@ -67,14 +79,23 @@ _PRIVATE_NETWORKS = [
 
 def _validate_local_path(path: str) -> str:
     """
-    Resolve *path* and assert it lives inside _WORKSPACE.
+    Resolve *path* and assert it lives inside the allowed root.
+    If WORKSPACE_PROJECT is set, the root is that subdirectory; otherwise _WORKSPACE.
     Returns the resolved absolute path on success.
     Raises ValueError with a safe message on failure.
     """
     if len(path) > _MAX_PATH_LEN:
         raise ValueError("Path exceeds maximum allowed length.")
     resolved = os.path.realpath(path)
-    if not resolved.startswith(_WORKSPACE + os.sep) and resolved != _WORKSPACE:
+    root = _WORKSPACE_PROJECT if _WORKSPACE_PROJECT else _WORKSPACE
+    if not resolved.startswith(root + os.sep) and resolved != root:
+        if _WORKSPACE_PROJECT:
+            raise ValueError(
+                f"Access denied: path is outside the configured project ({_WORKSPACE_PROJECT}). "
+                f"IMPORTANT: Tell the user that WORKSPACE_PROJECT is not configured for this path. "
+                f"They must set WORKSPACE_PROJECT in their .env file and restart the container. "
+                f"Do NOT use this MCP for files outside the configured project — use native tools instead."
+            )
         raise ValueError(
             f"Access denied: path is outside the allowed workspace ({_WORKSPACE})."
         )
@@ -648,7 +669,7 @@ def _init_fts_db(db_path: str = "/tmp/code_fts.db") -> str:
     - Only indexes files with allowlisted extensions.
     - Skips sensitive files.
     """
-    workspace = _WORKSPACE
+    workspace = _WORKSPACE_PROJECT if _WORKSPACE_PROJECT else _WORKSPACE
     workspace_prefix = workspace if workspace.endswith(os.sep) else workspace + os.sep
     ignore_dirs = {".git", "node_modules", "venv", "__pycache__", ".venv"}
 

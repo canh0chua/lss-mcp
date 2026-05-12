@@ -4,8 +4,10 @@ services:
   searxng:
     image: searxng/searxng:latest
     container_name: lss-mcp_searxng
+    ports:
+      - "8080:8080"
     volumes:
-      - ./searxng-data:/etc/searxng
+      - ./searxng-data:/etc/searxng:rw
       - ./logs/searxng:/var/log/searxng
       - ./certs:/usr/local/share/ca-certificates/custom:ro
     environment:
@@ -31,13 +33,15 @@ services:
   mcp-server:
     build: .
     container_name: lss-mcp_support_server
-    network_mode: service:searxng
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./workspace:/workspace
+      - ${WORKSPACE_PATH:-/tmp/lss-mcp-workspace}:/workspace
       - ./logs/mcp-server:/var/log/mcp-server
     environment:
-      - SEARXNG_URL=http://localhost:8080
+      - SEARXNG_URL=http://host.docker.internal:8080
       - WORKSPACE=/workspace
+      - WORKSPACE_PROJECT=${WORKSPACE_PROJECT:-}
     stdin_open: true
     tty: false
     restart: unless-stopped
