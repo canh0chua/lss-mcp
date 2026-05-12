@@ -138,10 +138,15 @@ Run these commands through your AI assistant:
       read_file_skeleton("sample_code.py")
       ```
 
-  10. **Read specific lines:**
-      ```
-      read_lines("sample_code.py", 1, 10)
-```
+   10. **Read specific lines:**
+       ```
+       read_lines("sample_code.py", 1, 10)
+       ```
+
+   11. **Get workspace info:**
+       ```
+       get_workspace_info()
+       ```
 
   7. **Run a safe command:**
      ```

@@ -208,3 +208,21 @@ Protected file reading with size checks to prevent accidental massive file loads
 safe_read_file("utils.js")
 safe_read_file("large_file.py", force=True)
 ```
+
+## get_workspace_info
+
+Returns workspace configuration to help AI understand path mappings between host and container.
+
+**Parameters:** None
+
+**Returns:** Dictionary with:
+- `workspace_root`: Container workspace path (e.g., "/workspace")
+- `workspace_host_path`: Host directory mounted (e.g., "/Users/minh/selfhost/")
+- `workspace_project`: Current WORKSPACE_PROJECT restriction (if any)
+- `subdirectories`: List of immediate subdirectories under workspace_root
+
+**Example:**
+```
+get_workspace_info()  # See available projects
+```
+Use this to discover which project directories are available and how to construct paths. For example, if you're working in `/Users/minh/selfhost/project1/`, access files using `project1/filename`. The `subdirectories` list shows all available projects.

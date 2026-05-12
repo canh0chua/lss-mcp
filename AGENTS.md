@@ -45,7 +45,7 @@ For more details on MCP server configuration, see the [OpenCode MCP documentatio
 claude mcp add local-support-stack -- docker exec -i lss-mcp_support_server python /app/server.py
 ```
 
-Then restart your Claude Code session. Use tools: `web_search`, `read_webpage`, `read_document`, `read_code_outline`, `run_command_compressed`, `compress_and_read_image`, `map_repository`, `focused_glob`, `smart_code_search`, `read_file_skeleton`, `read_lines`, `search_codebase`, `safe_read_file`.
+Then restart your Claude Code session. Use tools: `web_search`, `read_webpage`, `read_document`, `read_code_outline`, `run_command_compressed`, `compress_and_read_image`, `map_repository`, `focused_glob`, `search_codebase`, `safe_read_file`, `get_workspace_info`.
 
 ## Cursor IDE
 
@@ -106,3 +106,28 @@ docker exec -i lss-mcp_support_server python /app/server.py
 ```
 
 Ensure the client uses stdio transport.
+
+## Understanding Workspace Paths
+
+LSS-MCP maps a host directory (e.g., `/Users/minh/selfhost/`) to `/workspace` inside the container. All file tools accept paths relative to `/workspace`.
+
+To help the AI understand your workspace layout, use the `get_workspace_info` tool:
+
+```
+get_workspace_info()
+```
+
+This returns:
+- `workspace_root`: Container workspace path
+- `workspace_host_path`: Host directory mounted
+- `workspace_project`: Active project restriction (if any)
+- `subdirectories`: List of projects available under workspace
+
+Example usage:
+
+```
+get_workspace_info()  # See available projects
+read_document("lss-mcp/workspace/test.md")  # Access file in lss-mcp subdirectory
+```
+
+If you're working in `/Users/minh/selfhost/project1/`, prefix paths with `project1/`.

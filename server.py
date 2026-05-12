@@ -410,6 +410,33 @@ def compress_and_read_image(image_path: str) -> str:
 
 
 @mcp.tool()
+def get_workspace_info() -> dict:
+    """
+    Returns information about the workspace configuration to help the AI
+    understand path mappings between host and container.
+    
+    Returns:
+        dict with keys:
+        - workspace_root: Container path to workspace root (e.g., "/workspace")
+        - workspace_host_path: Host path mounted to workspace (if known)
+        - workspace_project: Current WORKSPACE_PROJECT restriction (if any)
+        - subdirectories: List of immediate subdirectories under workspace_root
+    """
+    info = {
+        "workspace_root": _WORKSPACE,
+        "workspace_host_path": os.environ.get("WORKSPACE_PATH", "unknown (set WORKSPACE_PATH in .env)"),
+        "workspace_project": _WORKSPACE_PROJECT if _WORKSPACE_PROJECT else None,
+        "subdirectories": []
+    }
+    try:
+        with os.scandir(_WORKSPACE) as entries:
+            info["subdirectories"] = sorted([entry.name for entry in entries if entry.is_dir()])
+    except Exception:
+        info["subdirectories"] = []
+    return info
+
+
+@mcp.tool()
 def map_repository(directory: str = None, max_depth: int = 3) -> str:
     if directory is None:
         directory = _WORKSPACE

@@ -76,6 +76,35 @@ Despite the optimized version having more total tokens (due to caching), the act
 
 See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, and other MCP clients.
 
+## AI Agent Skill (Optional)
+
+For optimal usage, install the **lss-mcp-usage** skill to teach your AI assistant how to use LSS-MCP tools efficiently, including workspace path mapping and best practices.
+
+### Installing the Skill
+
+Copy the skill directory to your agent's skills folder (location varies by agent):
+
+```bash
+# Generic installation - adjust path for your agent
+mkdir -p ~/.agents/skills
+cp -r .agents/skills/lss-mcp-usage ~/.agents/skills/
+```
+
+**Agent-specific locations:**
+- **OpenCode**: `~/.agents/skills/` (auto-loaded)
+- **Claude Code**: `~/.claude/skills/` or see Claude Code docs
+- **Cursor**: Check Cursor settings for skills directory
+- **Windsurf**: Check Windsurf MCP configuration
+- Consult your agent's documentation for the exact skills path
+
+The skill teaches the agent to:
+- Auto-discover workspace structure with `get_workspace_info()`
+- Correctly map host paths to container `/workspace`
+- Use tools in token-efficient order (outline → lines → read)
+- Apply best practices for searching, file navigation, and commands
+
+See `.agents/skills/lss-mcp-usage/SKILL.md` for full skill description.
+
 ## Using the Tools
 
 See [TOOLS.md](TOOLS.md) for complete tool reference with parameters and examples.

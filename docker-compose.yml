@@ -5,7 +5,7 @@ services:
     image: searxng/searxng:latest
     container_name: lss-mcp_searxng
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./searxng-data:/etc/searxng:rw
       - ./logs/searxng:/var/log/searxng
@@ -41,6 +41,7 @@ services:
     environment:
       - SEARXNG_URL=http://host.docker.internal:8080
       - WORKSPACE=/workspace
+      - WORKSPACE_PATH=${WORKSPACE_PATH:-/tmp/lss-mcp-workspace}
       - WORKSPACE_PROJECT=${WORKSPACE_PROJECT:-}
     stdin_open: true
     tty: false
