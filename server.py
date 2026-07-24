@@ -17,8 +17,20 @@ import glob
 from functools import lru_cache
 from urllib.parse import urlparse
 from mcp.server.fastmcp import FastMCP
-from crawl4ai import AsyncWebCrawler
-from docling.document_converter import DocumentConverter
+import httpx
+import tempfile
+
+# Lightweight document parsing (replaces docling)
+import fitz  # PyMuPDF
+import docx  # python-docx
+from pptx import Presentation
+import openpyxl
+from bs4 import BeautifulSoup
+import html2text
+import csv
+import tabulate
+from PIL import Image
+import pytesseract
 
 mcp = FastMCP("Local_AI_Support_Stack")
 
@@ -191,33 +203,175 @@ def web_search(query: str) -> str:
 
 @mcp.tool()
 async def read_webpage(url: str) -> str:
-    """Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown."""
+    """Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown.
+    
+    Uses CRW (Firecrawl-compatible API) for JS rendering and markdown extraction.
+    Requires the 'crw' and 'lightpanda' services to be running.
+    """
     if len(url) > _MAX_URL_LEN:
         return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
     try:
-        async with AsyncWebCrawler(verbose=False) as crawler:
-            result = await crawler.arun(url=url)
-            if not result.success:
-                return f"Failed to crawl URL. Error: {result.error_message}"
-            return result.markdown
+        crw_url = os.getenv("CRW_URL", "http://crw:3000")
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{crw_url}/v1/scrape",
+                json={"url": url, "formats": ["markdown"]},
+                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            )
+            data = resp.json()
+            if resp.status_code == 200 and data.get("success"):
+                return data["data"]["markdown"]
+            error_msg = data.get("error", str(data))
+            return f"Failed to fetch webpage: {error_msg}"
+    except httpx.RequestError as e:
+        return f"Failed to fetch webpage: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
         return f"Failed to fetch webpage: {str(e)}"
 
 
 @mcp.tool()
+async def web_search_crw(query: str) -> str:
+    """Search the web via CRW (backed by SearXNG). Returns top results with titles, URLs, and snippets.
+
+    This is an alternative to the local web_search tool that goes through CRW's
+    Firecrawl-compatible search endpoint.
+    """
+    if len(query) > _MAX_QUERY_LEN:
+        return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
+    try:
+        crw_url = os.getenv("CRW_URL", "http://crw:3000")
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{crw_url}/v1/search",
+                json={"query": query, "limit": 5},
+            )
+            data = resp.json()
+            if resp.status_code == 200 and data.get("success"):
+                results = data.get("data", [])[:5]
+                clean = [
+                    {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")}
+                    for r in results
+                ]
+                return json.dumps(clean)
+            return f"Search failed: {data.get('error', str(data))}"
+    except httpx.RequestError as e:
+        return f"Search failed: HTTP error connecting to CRW: {str(e)}"
+    except Exception as e:
+        return f"Search failed: {str(e)}"
+
+
+@mcp.tool()
+async def web_crawl(url: str, limit: int = 10) -> str:
+    """Crawl a website starting from a URL. Returns Markdown for up to `limit` pages.
+
+    Useful for mirroring a small site or reading multiple pages from a docs site.
+    Returns a JSON array of {url, markdown} objects.
+    """
+    if len(url) > _MAX_URL_LEN:
+        return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
+    try:
+        crw_url = os.getenv("CRW_URL", "http://crw:3000")
+        async with httpx.AsyncClient(timeout=120) as client:
+            # Start crawl
+            resp = await client.post(
+                f"{crw_url}/v1/crawl",
+                json={"url": url, "limit": limit, "scrapeOptions": {"formats": ["markdown"]}},
+            )
+            data = resp.json()
+            if resp.status_code != 200 or not data.get("success"):
+                return f"Crawl failed: {data.get('error', str(data))}"
+            crawl_id = data.get("id")
+            if not crawl_id:
+                return f"Crawl failed: no crawl ID returned. Response: {str(data)}"
+
+            # Poll until complete (max 60s)
+            for _ in range(30):
+                poll_resp = await client.get(f"{crw_url}/v1/crawl/{crawl_id}")
+                poll_data = poll_resp.json()
+                status = poll_data.get("status", "")
+                if status == "completed":
+                    pages = poll_data.get("data", [])
+                    clean = [{"url": p.get("metadata", {}).get("sourceURL", ""), "markdown": p.get("markdown", "")} for p in pages]
+                    return json.dumps(clean, indent=2)[:8000]
+                if status == "failed":
+                    return f"Crawl failed: {poll_data.get('error', 'unknown')}"
+                import asyncio
+                await asyncio.sleep(2)
+            return f"Crawl timed out after 60s. ID: {crawl_id}"
+    except httpx.RequestError as e:
+        return f"Crawl failed: HTTP error connecting to CRW: {str(e)}"
+    except Exception as e:
+        return f"Crawl failed: {str(e)}"
+
+
+@mcp.tool()
+async def web_map(url: str, limit: int = 50) -> str:
+    """Discover all pages on a website. Returns a list of URLs found on the site.
+
+    Useful for finding documentation pages, blog posts, or sitemap entries.
+    Returns a JSON array of {title, url} objects.
+    """
+    if len(url) > _MAX_URL_LEN:
+        return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
+    try:
+        crw_url = os.getenv("CRW_URL", "http://crw:3000")
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{crw_url}/v1/map",
+                json={"url": url, "limit": limit},
+            )
+            data = resp.json()
+            if resp.status_code == 200 and data.get("success"):
+                links = data.get("data", [])[:limit]
+                clean = [{"title": l.get("title", ""), "url": l.get("url", "")} for l in links]
+                return json.dumps(clean, indent=2)[:8000]
+            return f"Map failed: {data.get('error', str(data))}"
+    except httpx.RequestError as e:
+        return f"Map failed: HTTP error connecting to CRW: {str(e)}"
+    except Exception as e:
+        return f"Map failed: {str(e)}"
+
+
+@mcp.tool()
+async def web_extract(url: str, prompt: str) -> str:
+    """Extract structured data from a URL using CRW's LLM extraction.
+
+    Provide a URL and a natural-language prompt describing what to extract.
+    CRW will render the page and use an LLM to extract the requested data.
+
+    Example: extract(url="https://example.com/pricing", prompt="Extract all pricing tiers and their costs")
+    """
+    if len(url) > _MAX_URL_LEN:
+        return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
+    try:
+        crw_url = os.getenv("CRW_URL", "http://crw:3000")
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{crw_url}/v1/extract",
+                json={"urls": [url], "prompt": prompt},
+            )
+            data = resp.json()
+            if resp.status_code == 200 and data.get("success"):
+                return json.dumps(data.get("data", {}), indent=2)[:8000]
+            return f"Extract failed: {data.get('error', str(data))}"
+    except httpx.RequestError as e:
+        return f"Extract failed: HTTP error connecting to CRW: {str(e)}"
+    except Exception as e:
+        return f"Extract failed: {str(e)}"
+
+
+@mcp.tool()
 def read_document(path_or_url: str) -> str:
     """
-    Parse documents into Markdown using Docling.
-    Supports both local files and remote URLs with automatic format detection.
+    Parse documents into Markdown using lightweight libraries.
+    Supports both local files and remote URLs.
 
     Supported formats:
-    - PDF (including scanned with OCR)
-    - Microsoft Office: Word (.docx), PowerPoint (.pptx), Excel (.xlsx)
-    - Images: PNG, JPEG, TIFF, BMP, GIF, WEBP (with OCR)
-    - Web: HTML, XML
-    - Text: Markdown (.md), CSV (.csv), plain text (.txt)
-    - Documents: LaTeX, RTF, ODT
-    - Audio/Video: WAV, MP3, M4A, AAC, OGG, FLAC, MP4, AVI, MOV (requires `docling[asr]`)
+    - PDF (text only)
+    - Word (.docx), PowerPoint (.pptx), Excel (.xlsx)
+    - Images: PNG, JPEG, TIFF, BMP, GIF, WEBP (OCR via Tesseract)
+    - HTML, XML
+    - Plain text (.txt), CSV (.csv) converted to markdown tables
 
     Local paths are restricted to the workspace directory.
     Remote URLs must point to public hosts (private/internal IPs are blocked).
@@ -232,14 +386,12 @@ def read_document(path_or_url: str) -> str:
 
     try:
         if is_url:
-            # Validate URL for SSRF before processing.
             try:
                 _validate_url(path_or_url, require_public=True)
             except ValueError as e:
                 return f"Error: {e}"
             source = path_or_url
         else:
-            # Local file — enforce workspace boundary.
             try:
                 resolved = _validate_local_path(path_or_url)
             except ValueError as e:
@@ -250,47 +402,144 @@ def read_document(path_or_url: str) -> str:
                 return f"Error: Local file '{resolved}' not found."
             source = resolved
 
-        # Convert with caching
-        return _convert_source_cached(source)
-
-    except ImportError as e:
-        missing = str(e)
-        if "asr" in missing or "whisper" in missing or "soundfile" in missing:
-            return ("Error: Audio/Video support requires optional dependencies. "
-                    "Install with: pip install 'docling[asr]'")
-        return f"Error: Missing dependency: {e}"
+        return _convert_document_cached(source)
     except Exception as e:
         return f"Failed to parse document: {str(e)}"
 
 
 @lru_cache(maxsize=20)
-def _convert_source_cached(source: str) -> str:
-    """Convert a document source (file path or URL) to Markdown with caching."""
-    converter = _get_converter()
-    result = converter.convert(source)
-
-    # Error handling for different docling versions
-    has_error = False
-    error_message = ""
-    if hasattr(result, "status"):
-        if hasattr(result.status, "is_error"):
-            has_error = result.status.is_error
-        elif hasattr(result.status, "error"):
-            has_error = result.status.error
-    if hasattr(result, "errors") and result.errors:
-        has_error = True
-        error_message = str(result.errors)
-
-    if has_error:
-        raise RuntimeError(f"Docling conversion error: {error_message}")
-
-    return result.document.export_to_markdown()
+def _convert_document_cached(source: str) -> str:
+    """Cache wrapper for document conversion."""
+    return _convert_document(source)
 
 
-@lru_cache(maxsize=1)
-def _get_converter() -> DocumentConverter:
-    """Return a cached DocumentConverter instance."""
-    return DocumentConverter()
+def _convert_document(source: str) -> str:
+    """Convert a document source (file path or URL) to Markdown."""
+    if source.startswith(('http://', 'https://')):
+        try:
+            resp = requests.get(source, timeout=30)
+            if resp.status_code != 200:
+                return f"Failed to fetch URL: HTTP {resp.status_code}"
+            content = resp.content
+            content_type = resp.headers.get('Content-Type', '').split(';')[0]
+            mime_map = {
+                'application/pdf': '.pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+                'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
+                'image/webp': '.webp', 'text/html': '.html', 'application/xml': '.xml',
+                'text/plain': '.txt', 'text/csv': '.csv',
+            }
+            ext = mime_map.get(content_type, '.bin')
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            try:
+                return _convert_file(tmp_path)
+            finally:
+                os.unlink(tmp_path)
+        except requests.RequestException as e:
+            return f"Failed to download URL: {str(e)}"
+        except Exception as e:
+            return f"Error processing URL content: {str(e)}"
+    else:
+        return _convert_file(source)
+
+
+def _convert_file(path: str) -> str:
+    ext = Path(path).suffix.lower()
+    try:
+        if ext == '.pdf':
+            return _convert_pdf(path)
+        elif ext == '.docx':
+            return _convert_docx(path)
+        elif ext == '.pptx':
+            return _convert_pptx(path)
+        elif ext == '.xlsx':
+            return _convert_xlsx(path)
+        elif ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'):
+            return _convert_image(path)
+        elif ext in ('.html', '.htm'):
+            return _convert_html(path)
+        elif ext == '.xml':
+            return _convert_xml(path)
+        elif ext == '.txt':
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        elif ext == '.csv':
+            return _convert_csv(path)
+        else:
+            return f"Unsupported file type: {ext}"
+    except Exception as e:
+        return f"Error converting {path}: {str(e)}"
+
+
+def _convert_pdf(path: str) -> str:
+    doc = fitz.open(path)
+    texts = [page.get_text() for page in doc]
+    doc.close()
+    return "\n".join(texts)
+
+
+def _convert_docx(path: str) -> str:
+    document = docx.Document(path)
+    return "\n".join(para.text for para in document.paragraphs)
+
+
+def _convert_pptx(path: str) -> str:
+    prs = Presentation(path)
+    slides = []
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                slides.append(shape.text)
+    return "\n".join(slides)
+
+
+def _convert_xlsx(path: str) -> str:
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    sheets_md = []
+    for ws in wb.worksheets:
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+        headers = [str(c) if c is not None else "" for c in rows[0]]
+        table = [[str(c) if c is not None else "" for c in row] for row in rows[1:]]
+        md = tabulate.tabulate(table, headers=headers, tablefmt="github")
+        sheets_md.append(f"### Sheet: {ws.title}\n\n{md}")
+    wb.close()
+    return "\n\n".join(sheets_md)
+
+
+def _convert_image(path: str) -> str:
+    image = Image.open(path)
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    return pytesseract.image_to_string(image)
+
+
+def _convert_html(path: str) -> str:
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        soup = BeautifulSoup(f, 'html.parser')
+    converter = html2text.HTML2Text()
+    converter.ignore_links = False
+    return converter.handle(str(soup))
+
+
+def _convert_xml(path: str) -> str:
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        soup = BeautifulSoup(f, 'xml')
+    return soup.get_text(separator='\n', strip=True)
+
+
+def _convert_csv(path: str) -> str:
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        reader = csv.reader(f)
+        rows = list(reader)
+    if not rows:
+        return ""
+    return tabulate.tabulate(rows[1:], headers=rows[0], tablefmt="github")
 
 
 @mcp.tool()

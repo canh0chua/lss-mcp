@@ -2,19 +2,20 @@ version: '3.8'
 
 services:
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:2025.2.2-ab1e895cc
     container_name: lss-mcp_searxng
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:3003:8080"
     volumes:
       - ./searxng-data:/etc/searxng:rw
       - ./logs/searxng:/var/log/searxng
       - ./certs:/usr/local/share/ca-certificates/custom:ro
     environment:
-      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_BASE_URL=http://searxng:8080/
       - SEARXNG_URL_FORMAT=json
       - SEARXNG_LIMITER=false
       - SEARXNG_PUBLIC_INSTANCE=false
+      - SEARXNG_BOTDETECTION__ENABLED=false
       - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
     command: ["/bin/sh", "-c", "update-ca-certificates 2>/dev/null; /usr/local/searxng/dockerfiles/docker-entrypoint.sh"]
     restart: unless-stopped
@@ -30,6 +31,61 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  lightpanda:
+    image: lightpanda/browser:latest
+    container_name: lss-mcp_lightpanda
+    restart: unless-stopped
+    environment:
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  crw:
+    image: ghcr.io/us/crw:latest
+    container_name: lss-mcp_crw
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3000"  # Expose Firecrawl-compatible API to host (Hermes uses http://localhost:3002)
+    environment:
+      - RUST_LOG=info
+      - CRW_BIND_ADDRESS=0.0.0.0
+      - CRW_HOST_PORT=3000
+      - CRW_SEARCH__PROVIDER=duckduckgo
+      - CRW_SEARCH__SEARXNG_URL=http://searxng:8080
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+    mem_limit: 1g
+    memswap_limit: 1g
+    depends_on:
+      lightpanda:
+        condition: service_started
+      searxng:
+        condition: service_healthy
+    cap_add:
+      - SYS_NICE
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   mcp-server:
     build: .
     container_name: lss-mcp_support_server
@@ -39,13 +95,19 @@ services:
       - ${WORKSPACE_PATH:-/tmp/lss-mcp-workspace}:/workspace
       - ./logs/mcp-server:/var/log/mcp-server
     environment:
-      - SEARXNG_URL=http://host.docker.internal:8080
+      - SEARXNG_URL=http://lss-mcp_searxng:8080
       - WORKSPACE=/workspace
       - WORKSPACE_PATH=${WORKSPACE_PATH:-/tmp/lss-mcp-workspace}
       - WORKSPACE_PROJECT=${WORKSPACE_PROJECT:-}
+      - FIRECRAWL_API_URL=http://localhost:3002
     stdin_open: true
     tty: false
     restart: unless-stopped
+    depends_on:
+      crw:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:

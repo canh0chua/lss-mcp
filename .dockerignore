@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Cache & build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Git & version control
+.git/
+
+# IDE & editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Runtime data (mounted at runtime)
+logs/
+workspace/
+searxng-data/
+
+# Documentation & build context bloat
+*.md
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+*.lock

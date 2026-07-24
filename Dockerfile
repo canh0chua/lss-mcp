@@ -17,15 +17,21 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir \
     "mcp[cli]" \
-    crawl4ai \
-    docling \
     requests \
-    playwright \
+    httpx \
     Pillow \
     PyYAML \
-    pathspec
-
-RUN playwright install --with-deps chromium
+    pathspec \
+    "pymupdf>=1.24" \
+    python-docx \
+    python-pptx \
+    openpyxl \
+    beautifulsoup4 \
+    lxml \
+    html2text \
+    markdownify \
+    pytesseract \
+    tabulate
 
 COPY server.py .
 
