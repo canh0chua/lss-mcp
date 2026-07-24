@@ -78,7 +78,12 @@ Despite the optimized version having more total tokens (due to caching), the act
 
 ## Connecting AI Coding Assistants
 
-See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, and other MCP clients.
+See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, Hermes Agent, and other MCP clients.
+
+**Quick links:**
+- [Hermes Agent](AGENTS.md#hermes-agent) - add to `~/.hermes/config.yaml`
+- [OpenCode](AGENTS.md#opencode) - add to `opencode.json`
+- [Claude Code](AGENTS.md#claude-code) - `claude mcp add`
 
 ## Using the Tools
 

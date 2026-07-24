@@ -97,6 +97,20 @@ Add to VS Code settings.json or `.continue/config.json`:
    ```
 4. Restart Zed
 
+## Hermes Agent
+
+Add to `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  lss-mcp:
+    command: "docker"
+    args: ["exec", "-i", "lss-mcp_support_server", "python", "/app/server.py"]
+    timeout: 120
+```
+
+Restart Hermes. All tools auto-register as `mcp_lss-mcp_web_search`, `mcp_lss-mcp_read_webpage`, etc. -- available as first-class tools.
+
 ## Generic MCP Clients
 
 For any MCP-compatible client, use this connection command:
