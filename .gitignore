@@ -31,9 +31,9 @@ temp/
 *.swo
 
 # Test scripts (temporary debugging)
-test_mcp_stdio.py
-test_full_mcp.py
-debug_server.py
+test_*.py
+test_*/
+debug_*.py
 
 # OS
 .DS_Store

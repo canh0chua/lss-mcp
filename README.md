@@ -1,12 +1,16 @@
 # LSS-MCP (Local Support Stack MCP)
 
-Self-hosted Docker stack that exposes a single MCP server to Claude Code and other AI coding assistants. Offloads web searching, JS-heavy scraping, and PDF/document parsing to local open-source tools (SearXNG, Crawl4AI, Docling) to provide clean Markdown, saving roughly 80% to 90% on API token costs.
+Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (SearXNG, CRW/LightPanda, PyMuPDF, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs.
 
 ## Features
 
 - **web_search**: Private web search via local SearXNG instance
-- **read_webpage**: JavaScript-aware web scraping with Crawl4AI, returns clean Markdown
-- **read_document**: Parse documents (PDF, Office, images, HTML, CSV, audio/video, and more) into optimized Markdown with caching. Supports both local files and URLs.
+- **web_search_crw**: Alternative search through CRW (Firecrawl-compatible API with SearXNG backend)
+- **read_webpage**: JavaScript-aware web scraping via CRW + LightPanda headless browser, returns clean Markdown
+- **web_crawl**: Crawl entire websites starting from a URL, returns Markdown for each page
+- **web_map**: Discover all pages on a website (sitemap discovery)
+- **web_extract**: Extract structured data from URLs using LLM extraction (when configured)
+- **read_document**: Parse documents (PDF, Office, images via OCR, HTML, CSV) into Markdown with caching using lightweight local libraries. Supports both local files and URLs.
 - **read_code_outline**: AST-based Python file outlining (functions/classes only) to save tokens before reading full files
 - **run_command_compressed**: Execute shell commands with truncated successful output; preserves full error traces
 - **compress_and_read_image**: Downscale and compress UI screenshots to reduce vision token costs (800px max, 60% JPEG quality)
@@ -64,46 +68,17 @@ Despite the optimized version having more total tokens (due to caching), the act
    ```bash
    docker compose up -d --build
    ```
-   First build takes 5-10 minutes (downloads Chromium and OCR models)
+   First build takes 2-3 minutes (lightweight image, no Chromium)
 
 3. Verify containers are running:
    ```bash
-   docker ps --filter "name=mcp_"
+   docker compose ps
    ```
-   You should see `lss-mcp_searxng` and `lss-mcp_support_server`
+   You should see `lss-mcp_support_server`, `lss-mcp_crw`, `lss-mcp_searxng`, and `lss-mcp_lightpanda`
 
 ## Connecting AI Coding Assistants
 
 See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, and other MCP clients.
-
-## AI Agent Skill (Optional)
-
-For optimal usage, install the **lss-mcp-usage** skill to teach your AI assistant how to use LSS-MCP tools efficiently, including workspace path mapping and best practices.
-
-### Installing the Skill
-
-Copy the skill directory to your agent's skills folder (location varies by agent):
-
-```bash
-# Generic installation - adjust path for your agent
-mkdir -p ~/.agents/skills
-cp -r .agents/skills/lss-mcp-usage ~/.agents/skills/
-```
-
-**Agent-specific locations:**
-- **OpenCode**: `~/.agents/skills/` (auto-loaded)
-- **Claude Code**: `~/.claude/skills/` or see Claude Code docs
-- **Cursor**: Check Cursor settings for skills directory
-- **Windsurf**: Check Windsurf MCP configuration
-- Consult your agent's documentation for the exact skills path
-
-The skill teaches the agent to:
-- Auto-discover workspace structure with `get_workspace_info()`
-- Correctly map host paths to container `/workspace`
-- Use tools in token-efficient order (outline → lines → read)
-- Apply best practices for searching, file navigation, and commands
-
-See `.agents/skills/lss-mcp-usage/SKILL.md` for full skill description.
 
 ## Using the Tools
 
@@ -125,10 +100,27 @@ Search the web for real-time information
 web_search("latest Python 3.13 release date")
 ```
 
+### web_search_crw
+
+```
+Search the web via CRW (backed by SearXNG). Alternative to the local web_search.
+```
+
+**Parameters:**
+- `query` (string): Search query
+
+**Returns:** JSON array of up to 5 results with `title`, `url`, and `snippet`
+
+**Example:**
+```
+web_search_crw("latest AI research papers")
+```
+
 ### read_webpage
 
 ```
 Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown
+Uses CRW (Firecrawl-compatible) + LightPanda headless browser for JS rendering.
 ```
 
 **Parameters:**
@@ -141,31 +133,83 @@ Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown
 read_webpage("https://example.com/article")
 ```
 
+### web_crawl
+
+```
+Crawl a website starting from a URL. Returns Markdown for up to `limit` pages.
+Useful for mirroring small sites or reading multiple pages from a docs site.
+```
+
+**Parameters:**
+- `url` (string): Starting URL
+- `limit` (int, optional): Max pages to crawl (default: 10)
+
+**Returns:** JSON array of {url, markdown} objects
+
+**Example:**
+```
+web_crawl("https://docs.example.com")
+```
+
+### web_map
+
+```
+Discover all pages on a website. Returns a list of URLs found on the site.
+Useful for finding documentation pages, blog posts, or sitemap entries.
+```
+
+**Parameters:**
+- `url` (string): Website URL
+- `limit` (int, optional): Max links to return (default: 50)
+
+**Returns:** JSON array of {title, url} objects
+
+**Example:**
+```
+web_map("https://example.com")
+```
+
+### web_extract
+
+```
+Extract structured data from a URL using CRW's LLM extraction.
+Provide a URL and a natural-language prompt describing what to extract.
+```
+
+**Parameters:**
+- `url` (string): URL to extract data from
+- `prompt` (string): Natural-language description of what to extract
+
+**Returns:** Extracted JSON data
+
+**Example:**
+```
+web_extract(url="https://example.com/pricing", prompt="Extract all pricing tiers and their costs")
+```
+
 ### read_document
 
 ```
 Parse documents into optimized Markdown. Supports local files and URLs with caching.
+Uses lightweight local libraries (PyMuPDF, python-docx, Tesseract OCR).
 ```
 
 **Parameters:**
 - `path_or_url` (string): Absolute path to local file or https:// URL
 
-**Returns:** Markdown with preserved tables, images, and formatting
+**Returns:** Markdown with preserved tables and formatting
 
 **Supported formats:**
-- PDF (including scanned with OCR)
+- PDF (text extraction)
 - Office: DOCX, PPTX, XLSX
-- Images: PNG, JPEG, TIFF, BMP, GIF, WEBP
+- Images: PNG, JPEG, TIFF, BMP, GIF, WEBP (OCR via Tesseract)
 - Web: HTML, XML
 - Text: Markdown, CSV, plain text
-- Documents: LaTeX, RTF, ODT
-- Audio/Video: WAV, MP3, MP4, etc. (requires `docling[asr]`)
 
 **Example:**
 ```
 read_document("documents/report.pdf")
 read_document("https://example.com/image.png")
-read_document("https://example.com/audio.mp3")
 ```
 
 ### read_code_outline
@@ -226,7 +270,7 @@ Token-optimized repository mapper with .gitignore support and configurable depth
 - `directory` (string, optional): Root directory to scan (default: `/workspace`)
 - `max_depth` (integer, optional): Maximum directory depth (default: 3)
 
-**Returns:** Emoji-annotated tree (📂 for dirs, 📄 for files), respects `.gitignore`, filters junk, truncated to ~8000 chars
+**Returns:** Emoji-annotated tree (folder for dirs, file for files), respects `.gitignore`, filters junk, truncated to ~8000 chars
 
 **Example:**
 ```
@@ -346,17 +390,22 @@ safe_read_file("large_file.py", force=True)
 
 ```
 lss-mcp/
-├── docker-compose.yml
-├── Dockerfile
-├── server.py
-├── .env.example        # Workspace path configuration
-├── certs/              # Custom CA certificates (optional)
-└── searxng-data/       # SearXNG configuration (auto-created)
+├── docker-compose.yml      # 4 services: searxng, lightpanda, crw, mcp-server
+├── Dockerfile               # Lightweight Python image (~200MB vs 2GB+ with crawl4ai)
+├── server.py                # MCP server with 16+ tools
+├── config.toml              # CRW (Firecrawl-compatible) configuration
+├── .dockerignore            # Build context optimization
+├── .gitignore
+├── .env.example             # Workspace path configuration
+├── AGENTS.md                # AI assistant setup guide
+├── certs/                   # Custom CA certificates (optional)
+├── searxng-data/            # SearXNG configuration
+└── logs/                    # Container logs
 ```
 
 ## Workspace Mounting
 
-> ⚠️ **Important for AI agents:** File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the configured project directory. If a file is outside this directory, **do not attempt to use these tools** — use your native file reading capabilities instead. If `WORKSPACE_PROJECT` is not configured, notify the user immediately (see below).
+> Important for AI agents: File-based tools (`read_code_outline`, `safe_read_file`, `read_file_skeleton`, `smart_code_search`, `search_codebase`, `read_lines`) can **only** access files inside the configured project directory. If a file is outside this directory, **do not attempt to use these tools** -- use your native file reading capabilities instead. If `WORKSPACE_PROJECT` is not configured, notify the user immediately (see below).
 
 Two environment variables control file access:
 
@@ -392,7 +441,7 @@ docker compose up -d
 
 - At the start of each session, check whether the current working directory is inside the configured project by calling a file tool. If you get an "Access denied" error mentioning `WORKSPACE_PROJECT`, **stop and notify the user**:
   > "The LSS-MCP file tools are configured for a different project. Please update `WORKSPACE_PROJECT` in your `.env` file to `<current-project-folder>` and run `docker compose up -d` to restart the container."
-- For any file outside the configured project, use native file reading tools — do not attempt to use LSS-MCP file tools for those files.
+- For any file outside the configured project, use native file reading tools -- do not attempt to use LSS-MCP file tools for those files.
 
 ## Security Model
 
@@ -428,45 +477,30 @@ LSS-MCP uses a **workspace isolation model** to prevent unauthorized file access
 
 ```bash
 # .env - use specific project directory, NOT home or root
-WORKSPACE_PATH=/Users/you/projects        # ✅ Specific directory
-WORKSPACE_PROJECT=my-app                  # ✅ Single project
+WORKSPACE_PATH=/Users/you/projects        # Specific directory
+WORKSPACE_PROJECT=my-app                  # Single project
 ```
 
 ```bash
-# ❌ Avoid these - exposes entire filesystem
+# AVOID these - exposes entire filesystem
 WORKSPACE_PATH=/
 WORKSPACE_PATH=~
 ```
 
-### Bot Detection
+### URL SSRF Protection
 
-SearXNG includes bot detection that may block automated requests. Key configurations:
-
-```yaml
-# searxng-data/settings.yml
-botdetection:
-  # Trusted proxies (needed for Docker networking)
-  trusted_proxies:
-    - '172.16.0.0/12'   # Docker networks
-    - '192.168.0.0/16'  # Private networks
-    - '10.0.0.0/8'      # Private networks
-
-  # IP lists (allow/block specific IPs)
-  pass_ip:
-    - '192.168.0.0/16'
-  block_ip: []
-
-  # Rate limiting (requires Valkey/Redis)
-  ip_limit:
-    link_token: false
-```
-
-**Note:** Rate limiting (`ip_limit`) requires a Valkey/Redis container. For local development, it's disabled by default.
+URL-based tools (`read_webpage`, `read_document`) enforce SSRF protection:
+- Public URLs only -- private/loopback IPs (10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x) are blocked
+- Container-internal URLs (Docker service names) are allowed for CRW/SearXNG communication
 
 ## Ports
 
-- SearXNG Web UI: Random high port assigned by Docker (check `docker ps` for port mapping, e.g., `0.0.0.0:32768->8080/tcp`)
-- MCP Server: stdio (no network port)
+| Service | Host Port | Container Port | Access |
+|---------|-----------|----------------|--------|
+| SearXNG | 3003 | 8080 | Localhost only |
+| CRW (Firecrawl API) | 3002 | 3000 | Localhost only |
+| LightPanda | - | 9222 | Internal only |
+| MCP Server | - | stdio | Docker exec only |
 
 ## Logs
 
@@ -478,48 +512,5 @@ View real-time logs:
 ```bash
 docker logs -f lss-mcp_searxng
 docker logs -f lss-mcp_support_server
+docker logs -f lss-mcp_crw
 ```
-
-## Post-Setup Verification
-
-**⚠️ Token Cost Warning:** Running the full test suite consumes tokens. Testing is optional but recommended to verify integration.
-
-Before running tests, the AI assistant should ask the user for confirmation:
-
-> "Would you like me to run verification tests to ensure everything is working? This will test all tools and consume some tokens."
-
-If the user agrees, test the tools in this order:
-
-1. **web_search** - Test: `web_search("test query")`
-2. **read_webpage** - Test: `read_webpage("https://example.com")`
-3. **read_code_outline** - Test: `read_code_outline("server.py")`
-4. **run_command_compressed** - Test: `run_command_compressed("echo hello")`
-5. **read_file_skeleton** - Test: `read_file_skeleton("server.py")`
-
-All tools should return successful results. If any tool fails:
-- Check container status: `docker ps --filter "name=mcp_"`
-- Check logs: `docker logs lss-mcp_support_server`
-- Verify workspace path: File tools only work within `/workspace/{WORKSPACE_PROJECT}`
-
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
-
-## Advanced Configuration
-
-See [ADVANCED.md](ADVANCED.md) for proxy settings, custom SearXNG config, timeouts, and resource limits.
-
----
-
-Report issues: https://github.com/canh0chua/lss-mcp/issues
-
----
-
-<p align="center">
-  <a href="https://github.com/canh0chua/lss-mcp/stargazers"><img src="https://img.shields.io/github/stars/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub stars"/></a>
-  <a href="https://github.com/canh0chua/lss-mcp/network"><img src="https://img.shields.io/github/forks/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub forks"/></a>
-  <a href="https://github.com/canh0chua/lss-mcp/watchers"><img src="https://img.shields.io/github/watchers/canh0chua/lss-mcp?style=for-the-badge" alt="GitHub watchers"/></a>
-  <a href="https://github.com/canh0chua/lss-mcp"><img src="https://img.shields.io/github/license/canh0chua/lss-mcp?style=for-the-badge" alt="license"/></a>
-  <br/>
-  <a href="https://star-history.com/#canh0chua/lss-mcp"><img src="https://api.star-history.com/svg?type=svg&repo=canh0chua/lss-mcp" alt="Star History Chart" /></a>
-</p>
