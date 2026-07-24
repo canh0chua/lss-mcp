@@ -1,0 +1,37 @@
+[server]
+bind_address = "0.0.0.0"
+host_port = 3000
+
+# Search provider
+[search]
+provider = "searxng"
+searxng_url = "http://lss-mcp_searxng:8080"
+
+# Browser/JS rendering
+[renderer]
+mode = "lightpanda"  # Use lightpanda as the sole renderer
+
+[renderer.lightpanda]
+ws_url = "ws://lightpanda:9222/"
+
+# Chrome fallback (optional, disabled by default)
+# [renderer.chrome]
+# headless = true
+
+# Rate limiting
+[rate_limit]
+enabled = true
+max_requests_per_minute = 60
+
+# Auth (no auth needed for internal docker network)
+[auth]
+enabled = false
+
+# LLM extraction (disabled by default - relies on external LLM key)
+[llm]
+enabled = false
+
+# Caching
+[cache]
+max_size_mb = 200
+ttl_seconds = 300
