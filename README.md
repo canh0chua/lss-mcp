@@ -78,22 +78,37 @@ Despite the optimized version having more total tokens (due to caching), the act
 
 ## Connecting AI Coding Assistants
 
-LSS-MCP speaks the standard **Model Context Protocol (MCP)**. Any AI assistant with MCP support can use these tools.
+LSS-MCP speaks the standard **Model Context Protocol (MCP)**. There are two ways to integrate:
+
+### Option 1: Via Docker exec (Full MCP — 16+ tools)
+
+Connect any MCP client to the MCP server inside the container via Docker exec. This exposes all tools (web search, scrape, crawl, code analysis, document parsing, file tools, etc.).
+
+```bash
+docker exec -i lss-mcp_support_server python /app/server.py
+```
 
 **MCP-compatible (works out of the box):**
-- Hermes Agent — add to `~/.hermes/config.yaml`
+- Hermes Agent — add to `~/.hermes/config.yaml` as an MCP server
 - OpenCode — add to `opencode.json`
 - Claude Code — `claude mcp add`
 - Cursor — Settings → MCP Server
-- Windsurf — command palette
-- Continue (VS Code) — settings.json
-- Zed — settings.json
-- Any other MCP client
+- Windsurf, Continue, Zed — see AGENTS.md
 
 **Not compatible:**
 - OpenClaw — uses its own plugin system, not MCP
 
-See [AGENTS.md](AGENTS.md) for detailed configuration examples for each client.
+### Option 2: Via Firecrawl-compatible API (Built-in Hermes web tools only)
+
+Hermes Agent's native `web_search` and `web_extract` tools can use CRW directly as a **Firecrawl backend** — no MCP config needed. Point Hermes at CRW's Firecrawl-compatible API:
+
+```bash
+export FIRECRAWL_API_URL=http://localhost:3002
+```
+
+This replaces Hermes' default cloud Firecrawl with your local CRW instance. The agent's `web_search` and `web_extract` tools work automatically (search routed through SearXNG via CRW, page scraping via LightPanda via CRW). Pair with SearXNG directly for search to use both backends independently (see AGENTS.md for split config).
+
+See [AGENTS.md](AGENTS.md) for detailed configuration examples for each option.
 
 ## Using the Tools
 

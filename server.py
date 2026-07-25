@@ -322,8 +322,8 @@ async def web_map(url: str, limit: int = 50) -> str:
             )
             data = resp.json()
             if resp.status_code == 200 and data.get("success"):
-                links = data.get("data", [])[:limit]
-                clean = [{"title": l.get("title", ""), "url": l.get("url", "")} for l in links]
+                links = data.get("data", {}).get("links", [])[:limit]
+                clean = [{"title": "", "url": l} for l in links]
                 return json.dumps(clean, indent=2)[:8000]
             return f"Map failed: {data.get('error', str(data))}"
     except httpx.RequestError as e:
