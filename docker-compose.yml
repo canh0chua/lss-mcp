@@ -11,6 +11,8 @@ services:
       - FOURGET_INSTANCES=http://localhost
     ports:
       - "127.0.0.1:3004:80"
+    mem_limit: 256m
+    memswap_limit: 256m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
@@ -130,6 +132,7 @@ services:
     tty: false
     restart: unless-stopped
     mem_limit: 512m
+    memswap_limit: 512m
     depends_on:
       crw:
         condition: service_healthy
