@@ -129,6 +129,7 @@ services:
     stdin_open: true
     tty: false
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       crw:
         condition: service_healthy

@@ -21,17 +21,10 @@ from mcp.server.fastmcp import FastMCP
 import httpx
 import tempfile
 
-# Lightweight document parsing (replaces docling)
-import fitz  # PyMuPDF
-import docx  # python-docx
-from pptx import Presentation
-import openpyxl
-from bs4 import BeautifulSoup
-import html2text
-import csv
-import tabulate
-from PIL import Image
-import pytesseract
+# --- Heavy libraries: lazy-loaded inside functions that need them ---
+# fitz (PyMuPDF), docx, Presentation (python-pptx), openpyxl,
+# BeautifulSoup, html2text, Image (PIL), pytesseract
+# are imported on first use to keep baseline RSS low.
 
 mcp = FastMCP("Local_AI_Support_Stack")
 
@@ -521,6 +514,7 @@ def _convert_file(path: str) -> str:
 
 
 def _convert_pdf(path: str) -> str:
+    import fitz  # PyMuPDF (lazy)
     doc = fitz.open(path)
     texts = [page.get_text() for page in doc]
     doc.close()
@@ -528,11 +522,13 @@ def _convert_pdf(path: str) -> str:
 
 
 def _convert_docx(path: str) -> str:
+    import docx  # python-docx (lazy)
     document = docx.Document(path)
     return "\n".join(para.text for para in document.paragraphs)
 
 
 def _convert_pptx(path: str) -> str:
+    from pptx import Presentation  # python-pptx (lazy)
     prs = Presentation(path)
     slides = []
     for slide in prs.slides:
@@ -543,6 +539,8 @@ def _convert_pptx(path: str) -> str:
 
 
 def _convert_xlsx(path: str) -> str:
+    import openpyxl  # (lazy)
+    import tabulate  # (lazy)
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     sheets_md = []
     for ws in wb.worksheets:
@@ -558,6 +556,8 @@ def _convert_xlsx(path: str) -> str:
 
 
 def _convert_image(path: str) -> str:
+    from PIL import Image  # Pillow (lazy)
+    import pytesseract  # (lazy)
     image = Image.open(path)
     if image.mode != "RGB":
         image = image.convert("RGB")
@@ -565,6 +565,8 @@ def _convert_image(path: str) -> str:
 
 
 def _convert_html(path: str) -> str:
+    from bs4 import BeautifulSoup  # (lazy)
+    import html2text  # (lazy)
     with open(path, 'r', encoding='utf-8', errors='ignore') as f:
         soup = BeautifulSoup(f, 'html.parser')
     converter = html2text.HTML2Text()
@@ -573,12 +575,15 @@ def _convert_html(path: str) -> str:
 
 
 def _convert_xml(path: str) -> str:
+    from bs4 import BeautifulSoup  # (lazy)
     with open(path, 'r', encoding='utf-8', errors='ignore') as f:
         soup = BeautifulSoup(f, 'xml')
     return soup.get_text(separator='\n', strip=True)
 
 
 def _convert_csv(path: str) -> str:
+    import csv  # (lazy)
+    import tabulate  # (lazy)
     with open(path, 'r', encoding='utf-8', errors='ignore') as f:
         reader = csv.reader(f)
         rows = list(reader)

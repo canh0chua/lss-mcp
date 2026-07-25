@@ -510,7 +510,24 @@ URL-based tools (`read_webpage`, `read_document`) enforce SSRF protection:
 - Public URLs only -- private/loopback IPs (10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x) are blocked
 - Container-internal URLs (Docker service names) are allowed for CRW/SearXNG communication
 
-## Ports
+## Memory Limits
+
+| Service | Limit | Notes |
+|---------|-------|-------|
+| mcp-server | 512 MiB | Heavy libs (PyMuPDF, Pillow, etc.) are lazy-loaded on first use |
+| CRW | 1 GiB | Browser rendering needs headroom |
+| LightPanda | 1 GiB | Headless browser |
+| 4get | unlimited | Lightweight, ~27 MiB typical |
+
+## Future Optimizations
+
+These are documented for potential future work:
+
+1. **Multi-stage Dockerfile** (~50-100 MiB image savings) - Build deps in a builder stage, copy only runtime artifacts
+2. **Drop unused apt packages** (~50 MiB) - `tesseract-ocr`, `wget`, `gnupg` are rarely used; move to optional extras
+3. **Reduce uvicorn workers** - Currently default worker count; single-worker mode sufficient for MCP stdio usage
+4. **Drop PyMuPDF** (~30-50 MiB loaded) - If PDF rendering isn't needed in MCP server (CRW handles web scraping), remove `pymupdf` from Dockerfile
+5. **Switch to Alpine base image** - `python:3.11-alpine` instead of `python:3.11-slim` for smaller footprint
 
 | Service | Host Port | Container Port | Access |
 |---------|-----------|----------------|--------|
