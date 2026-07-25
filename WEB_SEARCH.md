@@ -8,7 +8,7 @@ The `web_search` tool provides full-text search capabilities via the 4get privac
 |-----------|------|---------|-------------|
 | `query` | string | (required) | Search query (max 500 characters) |
 | `type` | string | `"web"` | Search type: `web`, `image`, `video`, `news`, `music` |
-| `limit` | int | `5` | Number of results to return (1-20) |
+| `limit` | int | `10` | Number of results to return (1-20) |
 | `npt` | string | `""` | Next page token for pagination (from previous response) |
 | `scraper` | string | `""` | Backend scraper: `ddg`, `brave`, `yandex`, `google`, `qwant`, `startpage`, etc. |
 | `nsfw` | bool | `false` | Include explicit content (web only) |

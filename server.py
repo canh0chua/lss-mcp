@@ -173,7 +173,7 @@ def _validate_fourget_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-def web_search(query: str, type: str = "web", limit: int = 5, npt: str = "", scraper: str = "", nsfw: bool = False, country: str = "", lang: str = "", time_min: int = 0, time_max: int = 0) -> str:
+def web_search(query: str, type: str = "web", limit: int = 10, npt: str = "", scraper: str = "", nsfw: bool = False, country: str = "", lang: str = "", time_min: int = 0, time_max: int = 0) -> str:
     """Search the web using 4get (privacy-respecting proxy). Returns JSON results.
 
     Supported types:

@@ -1,6 +1,6 @@
 # LSS-MCP (Local Support Stack MCP)
 
-Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (SearXNG, CRW/LightPanda, PyMuPDF, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs.
+Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (4get, SearXNG, CRW/LightPanda, PyMuPDF, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs for tool calls.
 
 ## Features
 

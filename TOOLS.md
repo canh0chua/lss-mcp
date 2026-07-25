@@ -9,7 +9,7 @@ Search the web using 4get (privacy-respecting proxy). Returns JSON results.
 **Parameters:**
 - `query` (string): Search query (max 500 characters)
 - `type` (string): Search type: `web`, `image`, `video`, `news`, `music` (default: `web`)
-- `limit` (int): Number of results to return (1-20, default: 5)
+- `limit` (int): Number of results to return (1-20, default: 10)
 - `npt` (string): Next page token for pagination (from previous response, default: "")
 - `scraper` (string): Backend scraper (e.g., `ddg`, `brave`, `yandex`, `google`, `qwant`, `startpage`, default: "")
 - `nsfw` (bool): Include explicit content (web only, default: false)
@@ -200,7 +200,7 @@ Full-text search using SQLite FTS5 with BM25 ranking. Returns the most relevant 
 
 **Parameters:**
 - `query` (string): Search query
-- `limit` (integer, optional): Maximum number of results (default: 5)
+- `limit` (integer, optional): Maximum number of results (default: 10)
 
 **Returns:** Ranked results with file path, line number, and content
 
