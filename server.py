@@ -1,4 +1,6 @@
 import os
+import sys
+import logging
 import tempfile
 import ast
 from pathlib import Path
@@ -31,6 +33,23 @@ import csv
 import tabulate
 from PIL import Image
 import pytesseract
+
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+LOGGING_DIR = "/var/log/mcp-server"
+os.makedirs(LOGGING_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.FileHandler(os.path.join(LOGGING_DIR, "server.log")),
+        logging.StreamHandler(sys.stderr),
+    ],
+)
+log = logging.getLogger("lss-mcp")
 
 mcp = FastMCP("Local_AI_Support_Stack")
 
@@ -166,12 +185,14 @@ def _validate_searxng_url(url: str) -> str:
 @mcp.tool()
 def web_search(query: str) -> str:
     """Search the web for real-time information. Returns a compact JSON array to save tokens."""
+    log.info("web_search called with query=%r", query)
     if len(query) > _MAX_QUERY_LEN:
         return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
     try:
         raw_url = os.getenv("SEARXNG_URL", "http://localhost:8080")
         searxng_url = _validate_searxng_url(raw_url)
     except ValueError as e:
+        log.exception("configuration error in web_search")
         return f"Configuration error: {e}"
 
     try:
@@ -196,8 +217,10 @@ def web_search(query: str) -> str:
             }
             for r in results
         ]
+        log.info("web_search succeeded, returned %d results", len(clean_results))
         return json.dumps(clean_results)
     except Exception as e:
+        log.exception("web_search failed")
         return f"Search failed. Ensure SearXNG is running. Error: {str(e)}"
 
 
@@ -209,6 +232,7 @@ async def web_extract_crw(url: str) -> str:
     No LLM involved — pure browser rendering + DOM-to-markdown.
     Requires the 'crw' and 'lightpanda' services to be running.
     """
+    log.info("web_extract_crw called with url=%r", url)
     if len(url) > _MAX_URL_LEN:
         return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
     try:
@@ -221,12 +245,15 @@ async def web_extract_crw(url: str) -> str:
             )
             data = resp.json()
             if resp.status_code == 200 and data.get("success"):
+                log.info("web_extract_crw succeeded")
                 return data["data"]["markdown"]
             error_msg = data.get("error", str(data))
             return f"Failed to extract page content: {error_msg}"
     except httpx.RequestError as e:
+        log.exception("web_extract_crw failed")
         return f"Failed to extract page content: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
+        log.exception("web_extract_crw failed")
         return f"Failed to extract page content: {str(e)}"
 
 
@@ -237,6 +264,7 @@ async def web_search_crw(query: str) -> str:
     This is an alternative to the local web_search tool that goes through CRW's
     Firecrawl-compatible search endpoint.
     """
+    log.info("web_search_crw called with query=%r", query)
     if len(query) > _MAX_QUERY_LEN:
         return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
     try:
@@ -253,11 +281,14 @@ async def web_search_crw(query: str) -> str:
                     {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")}
                     for r in results
                 ]
+                log.info("web_search_crw succeeded, returned %d results", len(clean))
                 return json.dumps(clean)
             return f"Search failed: {data.get('error', str(data))}"
     except httpx.RequestError as e:
+        log.exception("web_search_crw failed")
         return f"Search failed: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
+        log.exception("web_search_crw failed")
         return f"Search failed: {str(e)}"
 
 
@@ -268,6 +299,7 @@ async def web_crawl(url: str, limit: int = 10) -> str:
     Useful for mirroring a small site or reading multiple pages from a docs site.
     Returns a JSON array of {url, markdown} objects.
     """
+    log.info("web_crawl called with url=%r, limit=%d", url, limit)
     if len(url) > _MAX_URL_LEN:
         return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
     try:
@@ -293,6 +325,7 @@ async def web_crawl(url: str, limit: int = 10) -> str:
                 if status == "completed":
                     pages = poll_data.get("data", [])
                     clean = [{"url": p.get("metadata", {}).get("sourceURL", ""), "markdown": p.get("markdown", "")} for p in pages]
+                    log.info("web_crawl succeeded, returned %d pages", len(clean))
                     return json.dumps(clean, indent=2)[:8000]
                 if status == "failed":
                     return f"Crawl failed: {poll_data.get('error', 'unknown')}"
@@ -300,8 +333,10 @@ async def web_crawl(url: str, limit: int = 10) -> str:
                 await asyncio.sleep(2)
             return f"Crawl timed out after 60s. ID: {crawl_id}"
     except httpx.RequestError as e:
+        log.exception("web_crawl failed")
         return f"Crawl failed: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
+        log.exception("web_crawl failed")
         return f"Crawl failed: {str(e)}"
 
 
@@ -312,6 +347,7 @@ async def web_map(url: str, limit: int = 50) -> str:
     Useful for finding documentation pages, blog posts, or sitemap entries.
     Returns a JSON array of {title, url} objects.
     """
+    log.info("web_map called with url=%r, limit=%d", url, limit)
     if len(url) > _MAX_URL_LEN:
         return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
     try:
@@ -325,11 +361,14 @@ async def web_map(url: str, limit: int = 50) -> str:
             if resp.status_code == 200 and data.get("success"):
                 links = data.get("data", {}).get("links", [])[:limit]
                 clean = [{"title": "", "url": l} for l in links]
+                log.info("web_map succeeded, returned %d links", len(clean))
                 return json.dumps(clean, indent=2)[:8000]
             return f"Map failed: {data.get('error', str(data))}"
     except httpx.RequestError as e:
+        log.exception("web_map failed")
         return f"Map failed: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
+        log.exception("web_map failed")
         return f"Map failed: {str(e)}"
 
 
@@ -1032,6 +1071,7 @@ def safe_read_file(file_path: str, force: bool = False) -> str:
     Checks file size first to avoid token bloat from large legacy files.
     Only files within the configured workspace directory are accessible.
     """
+    log.info("safe_read_file called with file_path=%r, force=%s", file_path, force)
     if len(file_path) > _MAX_PATH_LEN:
         return f"Error: path exceeds maximum allowed length."
     try:
@@ -1057,10 +1097,15 @@ def safe_read_file(file_path: str, force: bool = False) -> str:
             )
 
         with open(resolved, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
+            content = f.read()
+        log.info("safe_read_file succeeded, read %d bytes from %s", len(content), resolved)
+        return content
     except Exception as e:
+        log.exception("safe_read_file failed")
         return f"Error reading file: {str(e)}"
 
 
 if __name__ == "__main__":
+    log.info("lss-mcp server starting (workspace=%s, project=%s)", _WORKSPACE, _WORKSPACE_PROJECT or "<none>")
     mcp.run()
+    log.info("lss-mcp server stopped")
