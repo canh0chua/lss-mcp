@@ -4,16 +4,33 @@ Detailed documentation for all LSS-MCP tools.
 
 ## web_search
 
-Search the web for real-time information
+Search the web using 4get (privacy-respecting proxy). Returns JSON results.
 
 **Parameters:**
-- `query` (string): Search query
+- `query` (string): Search query (max 500 characters)
+- `type` (string): Search type: `web`, `image`, `video`, `news`, `music` (default: `web`)
+- `limit` (int): Number of results to return (1-20, default: 5)
+- `npt` (string): Next page token for pagination (from previous response, default: "")
+- `scraper` (string): Backend scraper (e.g., `ddg`, `brave`, `yandex`, `google`, `qwant`, `startpage`, default: "")
+- `nsfw` (bool): Include explicit content (web only, default: false)
+- `country` (string): Two-letter country code (e.g., `us`, `ca`, `uk`, `de`, default: "")
+- `lang` (string): Language code (e.g., `en`, `fr`, `de`, `es`, default: "")
+- `time_min` (int): Unix timestamp for earliest result (date range filter, default: 0)
+- `time_max` (int): Unix timestamp for latest result (date range filter, default: 0)
 
-**Returns:** JSON array of up to 5 results with `title`, `url`, and `snippet`
+**Returns:** JSON string with results and optional pagination token.
+
+Response format varies by `type`:
+
+- **web**: `{ "results": [ { "title": "...", "url": "...", "snippet": "..." } ], "npt": "..." }`
+- **image**: `{ "results": [ { "title": "...", "url": "..." (full size), "thumbnail": "..." } ], "npt": "..." }`
+- **video**: `{ "results": [ { "title": "...", "url": "...", "description": "...", "duration": "...", "views": "..." } ], "npt": "..." }`
+- **news**: `{ "results": [ { "title": "...", "url": "...", "description": "...", "date": "..." (Unix timestamp), "source": "..." } ], "npt": "..." }`
+- **music**: `{ "results": [ { "title": "...", "artist": "...", "album": "...", "duration": "..." } ], "npt": "..." }`
 
 **Example:**
 ```
-web_search("latest Python 3.13 release date")
+web_search("hello world", type="web", limit=3, scraper="brave", country="us")
 ```
 
 ## read_webpage

@@ -157,48 +157,152 @@ def _validate_searxng_url(url: str) -> str:
     if not parsed.netloc:
         raise ValueError("SEARXNG_URL is missing a host.")
     return url
-
+def _validate_fourget_url(url: str) -> str:
+    """Validate the 4get base URL (localhost is explicitly allowed)."""
+    if len(url) > _MAX_URL_LEN:
+        raise ValueError("FOURGET_URL exceeds maximum allowed length.")
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"FOURGET_URL has unsupported scheme '{parsed.scheme}'.")
+    if not parsed.netloc:
+        raise ValueError("FOURGET_URL is missing a host.")
+    return url
 
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-def web_search(query: str) -> str:
-    """Search the web for real-time information. Returns a compact JSON array to save tokens."""
+def web_search(query: str, type: str = "web", limit: int = 5, npt: str = "", scraper: str = "", nsfw: bool = False, country: str = "", lang: str = "", time_min: int = 0, time_max: int = 0) -> str:
+    """Search the web using 4get (privacy-respecting proxy). Returns JSON results.
+
+    Supported types:
+      - web: general web results (title, url, snippet)
+      - image: images (title, url, thumbnail, width, height)
+      - video: videos (title, url, description, duration, views)
+      - news: recent news articles (title, url, description, date, source)
+      - music: music tracks (title, artist, album, stream url)
+
+    Use 'npt' (next page token) from a previous response to paginate.
+    """
     if len(query) > _MAX_QUERY_LEN:
         return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
     try:
-        raw_url = os.getenv("SEARXNG_URL", "http://localhost:8080")
-        searxng_url = _validate_searxng_url(raw_url)
+        raw_url = os.getenv("FOURGET_URL", "http://localhost:8081")
+        fourget_url = _validate_fourget_url(raw_url)
     except ValueError as e:
         return f"Configuration error: {e}"
 
+    # Map type to 4get API endpoint and result key
+    endpoint_map = {
+        "web":    ("/api/v1/web",    "web"),
+        "image":  ("/api/v1/images", "image"),
+        "video":  ("/api/v1/videos", "video"),
+        "news":   ("/api/v1/news",   "news"),
+        "music":  ("/api/v1/music",  "song"),
+    }
+
+    if type not in endpoint_map:
+        return f"Invalid type '{type}'. Supported: {', '.join(endpoint_map.keys())}"
+
+    endpoint, result_key = endpoint_map[type]
+    limit = max(1, min(limit, 20))
+
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "X-Forwarded-For": "127.0.0.1",
-            "X-Real-IP": "127.0.0.1"
-        }
-        response = requests.get(
-            f"{searxng_url}/search",
-            params={"q": query, "format": "json"},
-            headers=headers,
-            timeout=10
+        params = {}
+        if npt:
+            params["npt"] = npt
+        else:
+            params["s"] = query
+        if scraper:
+            params["scraper"] = scraper
+        if nsfw:
+            params["nsfw"] = "1"
+        if country:
+            params["country"] = country
+        if lang:
+            params["lang"] = lang
+        if time_min:
+            params["time_min"] = time_min
+        if time_max:
+            params["time_max"] = time_max
+        if country:
+            params["country"] = country
+        if lang:
+            params["lang"] = lang
+        if time_min:
+            params["time_min"] = time_min
+        if time_max:
+            params["time_max"] = time_max
+        if scraper:
+            params["scraper"] = scraper
+        if nsfw:
+            params["nsfw"] = "1"
+        if country:
+            params["country"] = country
+        if lang:
+            params["lang"] = lang
+        if time_min:
+            params["time_min"] = time_min
+        if time_max:
+            params["time_max"] = time_max
+        if country:
+            params["country"] = country
+        if lang:
+            params["lang"] = lang
+        if time_min:
+            params["time_min"] = time_min
+        if time_max:
+            params["time_max"] = time_max
+        if npt:
+            params["npt"] = npt
+        else:
+            params["s"] = query
+
+        resp = requests.get(
+            f"{fourget_url}{endpoint}",
+            params=params,
+            timeout=15
         )
-        results = response.json().get("results", [])[:5]
-        # Use .get() with safe defaults to avoid KeyError on malformed results.
-        clean_results = [
-            {
-                "title": r.get("title", ""),
-                "url": r.get("url", ""),
-                "snippet": r.get("content", ""),
-            }
-            for r in results
-        ]
-        return json.dumps(clean_results)
+        data = resp.json()
+        if data.get("status") != "ok":
+            return f"Search failed: 4get returned status '{data.get('status', 'unknown')}'"
+
+        # Build compact output per type
+        if type == "web":
+            raw = data.get(result_key, [])[:limit]
+            out = [{"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")} for r in raw]
+        elif type == "image":
+            raw = data.get(result_key, [])[:limit]
+            out = []
+            for r in raw:
+                sources = r.get("source", [])
+                thumb = sources[-1].get("url", "") if sources else ""
+                full = sources[0].get("url", "") if sources else ""
+                out.append({"title": r.get("title", ""), "url": full, "thumbnail": thumb})
+        elif type == "video":
+            raw = data.get(result_key, [])[:limit]
+            out = [{"title": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", ""), "duration": r.get("time", ""), "views": r.get("views", "")} for r in raw]
+        elif type == "news":
+            raw = data.get(result_key, [])[:limit]
+            out = [{"title": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", ""), "date": r.get("date"), "source": r.get("source", "")} for r in raw]
+        elif type == "music":
+            raw = data.get(result_key, [])[:limit]
+            out = [{"title": r.get("title", ""), "artist": r.get("artist", ""), "album": r.get("album", ""), "duration": r.get("time", "")} for r in raw]
+
+        # Include spelling correction if available (web only)
+        result = {"results": out}
+        if type == "web":
+            spelling = data.get("spelling", {})
+            if spelling.get("type") != "no_correction":
+                result["spelling"] = spelling
+        # Include next page token if available
+        if data.get("npt"):
+            result["npt"] = data["npt"]
+
+        return json.dumps(result)
     except Exception as e:
-        return f"Search failed. Ensure SearXNG is running. Error: {str(e)}"
+        return f"Search failed. Ensure 4get is running. Error: {str(e)}"
 
 
 @mcp.tool()
@@ -224,39 +328,6 @@ async def web_extract_crw(url: str) -> str:
                 return data["data"]["markdown"]
             error_msg = data.get("error", str(data))
             return f"Failed to extract page content: {error_msg}"
-    except httpx.RequestError as e:
-        return f"Failed to extract page content: HTTP error connecting to CRW: {str(e)}"
-    except Exception as e:
-        return f"Failed to extract page content: {str(e)}"
-
-
-@mcp.tool()
-async def web_search_crw(query: str) -> str:
-    """Search the web via CRW (backed by SearXNG). Returns top results with titles, URLs, and snippets.
-
-    This is an alternative to the local web_search tool that goes through CRW's
-    Firecrawl-compatible search endpoint.
-    """
-    if len(query) > _MAX_QUERY_LEN:
-        return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
-    try:
-        crw_url = os.getenv("CRW_URL", "http://crw:3000")
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                f"{crw_url}/v1/search",
-                json={"query": query, "limit": 5},
-            )
-            data = resp.json()
-            if resp.status_code == 200 and data.get("success"):
-                results = data.get("data", {}).get("results", [])[:5]
-                clean = [
-                    {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")}
-                    for r in results
-                ]
-                return json.dumps(clean)
-            return f"Search failed: {data.get('error', str(data))}"
-    except httpx.RequestError as e:
-        return f"Search failed: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
         return f"Search failed: {str(e)}"
 

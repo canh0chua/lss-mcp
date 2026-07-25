@@ -1,6 +1,28 @@
 version: '3.8'
 
 services:
+  fourget:
+    image: luuul/4get:latest
+    container_name: lss-mcp_fourget
+    restart: unless-stopped
+    environment:
+      - FOURGET_PROTO=http
+      - FOURGET_SERVER_NAME=localhost
+      - FOURGET_INSTANCES=http://localhost
+    ports:
+      - "127.0.0.1:3004:80"  # Expose on host port 3004
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   searxng:
     image: searxng/searxng:2025.2.2-ab1e895cc
     container_name: lss-mcp_searxng
@@ -56,7 +78,7 @@ services:
     container_name: lss-mcp_crw
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3002:3000"  # Expose Firecrawl-compatible API to host (Hermes uses http://localhost:3002)
+      - "127.0.0.1:3002:3000"
     environment:
       - RUST_LOG=info
       - CRW_BIND_ADDRESS=0.0.0.0
@@ -96,6 +118,7 @@ services:
       - ./logs/mcp-server:/var/log/mcp-server
     environment:
       - SEARXNG_URL=http://lss-mcp_searxng:8080
+      - FOURGET_URL=http://lss-mcp_fourget:80
       - WORKSPACE=/workspace
       - WORKSPACE_PATH=${WORKSPACE_PATH:-/tmp/lss-mcp-workspace}
       - WORKSPACE_PROJECT=${WORKSPACE_PROJECT:-}
@@ -107,6 +130,8 @@ services:
       crw:
         condition: service_healthy
       searxng:
+        condition: service_healthy
+      fourget:
         condition: service_healthy
     logging:
       driver: "json-file"
