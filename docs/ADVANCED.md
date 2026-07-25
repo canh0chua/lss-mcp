@@ -19,44 +19,21 @@ If your network uses a MITM proxy (e.g., Zscaler, Netskope, Palo Alto), you need
 That's it. The certificates are automatically trusted by:
 - Python (`requests`, `httpx`, `urllib`) via `SSL_CERT_FILE`
 - Playwright/Chromium via `NODE_EXTRA_CA_CERTS`
-- SearXNG's outbound search queries via `REQUESTS_CA_BUNDLE`
+- 4get adapter's outbound search queries via `REQUESTS_CA_BUNDLE`
 - All system-level TLS via `update-ca-certificates`
 
 The `certs/` directory is gitignored — your certificates stay local.
 
-## Custom SearXNG Settings
+## Search Backend (SearXNG-to-4get Adapter)
 
-SearXNG configuration lives in `./searxng-data`. Edit `searxng/settings.yml` inside that directory to customize:
-- Enable/disable engines
-- Add rate limits
-- Change UI settings
+The search adapter runs inside the `mcp-server` container and translates SearXNG-compatible API requests to the 4get search backend. No separate SearXNG container is needed.
 
-After changes, restart: `docker compose restart searxng`
-
-### Bot Detection
-
-SearXNG includes bot detection that may block automated requests. Key configurations:
-
-```yaml
-# searxng-data/settings.yml
-botdetection:
-  # Trusted proxies (needed for Docker networking)
-  trusted_proxies:
-    - '172.16.0.0/12'   # Docker networks
-    - '192.168.0.0/16'  # Private networks
-    - '10.0.0.0/8'      # Private networks
-
-  # IP lists (allow/block specific IPs)
-  pass_ip:
-    - '192.168.0.0/16'
-  block_ip: []
-
-  # Rate limiting (requires Valkey/Redis)
-  ip_limit:
-    link_token: false
+If SearXNG is needed as an emergency fallback, it is available commented out in `docker-compose.yml` on port 3005. To start it:
+```bash
+docker compose --profile fallback up -d searxng
 ```
 
-**Note:** Rate limiting (`ip_limit`) requires a Valkey/Redis container. For local development, it's disabled by default.
+After changes, restart: `docker compose restart mcp-server`
 
 ## Increasing Timeouts
 
@@ -76,11 +53,9 @@ deploy:
 ## Logs
 
 Logs are persisted to the `logs/` directory:
-- `logs/searxng/` - SearXNG container logs
 - `logs/mcp-server/` - MCP server container logs
 
 View real-time logs:
 ```bash
-docker logs -f lss-mcp_searxng
 docker logs -f lss-mcp_support_server
 ```

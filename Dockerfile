@@ -31,8 +31,10 @@ RUN pip install --no-cache-dir \
     html2text \
     markdownify \
     pytesseract \
-    tabulate
+    tabulate \
+    fastapi \
+    "uvicorn[standard]"
 
-COPY server.py .
+COPY server.py gateway.py ./
 
 ENTRYPOINT ["python", "/app/server.py"]

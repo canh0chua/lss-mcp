@@ -10,6 +10,7 @@ import sqlite3
 import shlex
 import threading
 import ipaddress
+import logging
 import requests
 import re
 import pathspec
@@ -1131,6 +1132,41 @@ def safe_read_file(file_path: str, force: bool = False) -> str:
             return f.read()
     except Exception as e:
         return f"Error reading file: {str(e)}"
+
+
+# ---------------------------------------------------------------------------
+# SearXNG-to-4get Gateway (embedded HTTP server)
+# ---------------------------------------------------------------------------
+# Starts a FastAPI gateway on port 8080 inside the MCP server container.
+# CRW connects here thinking it's talking to SearXNG; we translate to 4get.
+
+def _start_gateway():
+    """Run the gateway FastAPI server in a daemon thread."""
+    import uvicorn
+    from gateway import gateway_app, FOURGET_URL as _  # noqa: F811
+
+    # Set FOURGET_URL in the gateway module
+    import gateway
+    gateway.FOURGET_URL = os.getenv("FOURGET_URL", "http://localhost:80")
+
+    logging.getLogger("gateway").info(
+        "Starting SearXNG-to-4get gateway on 0.0.0.0:8080 (backend: %s)",
+        gateway.FOURGET_URL,
+    )
+    config = uvicorn.Config(
+        gateway.gateway_app,
+        host="0.0.0.0",
+        port=8080,
+        log_level="warning",
+        access_log=False,
+    )
+    server = uvicorn.Server(config)
+    server.run()
+
+
+# Start gateway in a background daemon thread so it doesn't block MCP stdio
+_gateway_thread = threading.Thread(target=_start_gateway, daemon=True, name="gateway")
+_gateway_thread.start()
 
 
 if __name__ == "__main__":

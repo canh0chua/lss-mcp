@@ -4,9 +4,9 @@ Common issues and solutions for LSS-MCP.
 
 ## "Search failed" error
 
-- Check SearXNG is running: `docker logs lss-mcp_searxng`
-- Wait 30 seconds after first startup for SearXNG to initialize
-- Port 8080 should be mapped: `docker ps` shows `0.0.0.0:8080->8080/tcp`
+- Check the mcp-server is running: `docker logs lss-mcp_support_server`
+- Wait 30 seconds after first startup for the adapter to initialize
+- Port 3003 should be mapped: `docker ps` shows `0.0.0.0:3003->3003/tcp`
 
 ## "Failed to fetch webpage"
 

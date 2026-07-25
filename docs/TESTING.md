@@ -1,16 +1,16 @@
-# LSS-MCP Testing Guide (Optional)
-
-**⚠️ Token Cost Warning:** Running these tests consumes API tokens. Testing is recommended for initial verification but can be skipped to save costs. Only run tests if you want to confirm all tools are working properly.
-
-After completing the setup and configuring your AI assistant with the MCP server, use this guide (optionally) to verify everything is working correctly.
-
-## Prerequisites
-
-1. Docker containers are running:
-   ```bash
-   docker ps --filter "name=mcp_"
-   ```
-   You should see both `lss-mcp_searxng` and `lss-mcp_support_server` with healthy status.
+1|# LSS-MCP Testing Guide (Optional)
+2|
+3|**⚠️ Token Cost Warning:** Running these tests consumes API tokens. Testing is recommended for initial verification but can be skipped to save costs. Only run tests if you want to confirm all tools are working properly.
+4|
+5|After completing the setup and configuring your AI assistant with the MCP server, use this guide (optionally) to verify everything is working correctly.
+6|
+7|## Prerequisites
+8|
+9|1. Docker containers are running:
+10|   ```bash
+11|   docker ps --filter "name=mcp_"
+12|   ```
+13|   You should see `lss-mcp_support_server` with healthy status.
 
 2. Your AI assistant has the MCP server configured (see README.md for agent-specific instructions).
 
@@ -165,23 +165,23 @@ Run these commands through your AI assistant:
 
 ## Troubleshooting
 
-### "SearXNG healthcheck failed"
+### "Search adapter healthcheck failed"
 
-- Wait 30-60 seconds after first startup for SearXNG to initialize
-- Check logs: `docker logs lss-mcp_searxng`
-- Verify health endpoint: `curl http://localhost:8080/healthz` from host
+- Wait 30-60 seconds after first startup for the adapter to initialize
+- Check logs: `docker logs lss-mcp_support_server`
+- Verify health endpoint: `curl http://localhost:3003/healthz` from host
 
 ### "Search failed" error
 
-- Ensure SearXNG is running: `docker ps | grep lss-mcp_searxng`
-- Check that the container is healthy: `docker inspect lss-mcp_searxng | grep -A 5 Health`
-- Restart if needed: `docker compose restart searxng`
+- Check the mcp-server is running: `docker logs lss-mcp_support_server`
+- Wait 30 seconds after first startup for the adapter to initialize
+- Port 3003 should be mapped: `docker ps` shows `0.0.0.0:3003->3003/tcp`
 
 ### "Failed to fetch webpage"
 
-- Crawl4AI needs network access; verify container can reach the URL
-- Check mcp-server logs: `docker logs lss-mcp_support_server`
-- The container uses `network_mode: service:searxng`, so it shares network namespace
+- CRW requires network access; ensure the container can reach the URL
+- Check logs: `docker logs lss-mcp_support_server`
+- The container uses `network_mode: service:mcp-server`, so it shares network namespace
 
 ### "File not found"
 
