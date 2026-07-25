@@ -57,7 +57,7 @@ Parse documents into optimized Markdown. Supports local files and URLs with cach
 **Returns:** Markdown with preserved tables, images, and formatting
 
 **Supported formats:**
-- PDF (including scanned with OCR)
+- PDF (text + scanned via pdf-inspector + pytesseract OCR)
 - Office: DOCX, PPTX, XLSX
 - Images: PNG, JPEG, TIFF, BMP, GIF, WEBP
 - Web: HTML, XML

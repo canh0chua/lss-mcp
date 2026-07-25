@@ -1,6 +1,6 @@
 # LSS-MCP (Local Support Stack MCP)
 
-Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (4get, CRW/LightPanda, PyMuPDF, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs for tool calls.
+Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (4get, CRW/LightPanda, pdf-inspector, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs for tool calls.
 
 ## Features
 
@@ -201,7 +201,7 @@ web_map("https://example.com")
 
 ```
 Parse documents into optimized Markdown. Supports local files and URLs with caching.
-Uses lightweight local libraries (PyMuPDF, python-docx, Tesseract OCR).
+Uses lightweight local libraries (pdf-inspector, python-docx, pytesseract).
 ```
 
 **Parameters:**
@@ -514,7 +514,7 @@ URL-based tools (`read_webpage`, `read_document`) enforce SSRF protection:
 
 | Service | Limit | Notes |
 |---------|-------|-------|
-| mcp-server | 512 MiB | Heavy libs (PyMuPDF, Pillow, etc.) are lazy-loaded on first use |
+| mcp-server | 512 MiB | Heavy libs (pdf-inspector, pytesseract, etc.) are lazy-loaded on first use |
 | CRW | 1 GiB | Browser rendering needs headroom |
 | LightPanda | 1 GiB | Headless browser |
 | 4get | unlimited | Lightweight, ~27 MiB typical |
