@@ -28,6 +28,10 @@ The `certs/` directory is gitignored — your certificates stay local.
 
 The search adapter runs inside the `mcp-server` container and translates SearXNG-compatible API requests to the 4get search backend. No separate SearXNG container is needed.
 
+**Why 4get over SearXNG?**
+- **Memory**: ~20MB (4get adapter) vs ~200MB (SearXNG container) — 10× lighter
+- **Reliability**: 4get proxies directly through frontend scrapers; no engine CAPTCHA blocks or anti-bot failures that SearXNG search engines frequently hit
+
 If SearXNG is needed as an emergency fallback, it is available commented out in `docker-compose.yml` on port 3005. To start it:
 ```bash
 docker compose --profile fallback up -d searxng

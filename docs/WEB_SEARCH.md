@@ -95,12 +95,12 @@ web_search("landscape photography", type="image", scraper="yandex", nsfw=False, 
 
 ## Migration from Old Versions
 
-Previously, LSS-MCP used `web_search` (SearXNG) and `web_search_crw` (CRW). Both have been replaced by this single unified tool using 4get. All MCP clients should update to use the new parameter signature.
+Previously, LSS-MCP used `web_search` (SearXNG) and `web_search_crw` (CRW). Both have been replaced by this single unified tool using the 4get adapter. All MCP clients should update to use the new parameter signature.
 
 Old code:
 ```python
 # Before
-web_search("query")  # returned only web results from SearXNG
+web_search("query")  # returned only web results from the 4get adapter
 ```
 
 New code:

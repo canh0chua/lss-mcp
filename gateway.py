@@ -1,8 +1,14 @@
 """
-SearXNG-to-4get Gateway (embedded in MCP server container)
+SearXNG-compatible Gateway for 4get (embedded in MCP server container)
 
 Exposes a SearXNG-compatible API on port 8080 and translates requests to the
-4get API. Runs as a daemon thread alongside the MCP stdio server.
+4get API. CRW and other clients that expect SearXNG connect here seamlessly.
+
+Why this exists instead of running SearXNG:
+- ~20MB image vs ~200MB+ SearXNG container
+- No upstream engine CAPTCHAs or blocked requests (4get handles that upstream)
+- 4get is already deployed and maintained in this stack
+- Single container to manage instead of two
 
 Started by server.py via start_gateway_thread().
 """

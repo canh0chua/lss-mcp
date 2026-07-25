@@ -400,10 +400,10 @@ safe_read_file("large_file.py", force=True)
 
 ```
 lss-mcp/
-��── docker-compose.yml         # 4 services: fourget, lightpanda, crw, mcp-server
+├── docker-compose.yml         # 4 services: fourget, lightpanda, crw, mcp-server
 ├── Dockerfile                 # Lightweight Python image (~200MB vs 2GB+ with crawl4ai)
 ├── server.py                  # MCP server with 16+ tools
-├── gateway.py                 # SearXNG-to-4get API adapter (runs in-process)
+├── gateway.py                 # SearXNG-compatible adapter for 4get (~20MB vs SearXNG's ~200MB)
 ├── config.toml                # CRW (Firecrawl-compatible) configuration
 ├── .dockerignore
 ├── .gitignore
