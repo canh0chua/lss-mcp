@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir \
     Pillow \
     PyYAML \
     pathspec \
-    "pymupdf>=1.24" \
+    pdf-inspector \
     python-docx \
     python-pptx \
     openpyxl \

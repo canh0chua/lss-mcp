@@ -514,9 +514,25 @@ def _convert_file(path: str) -> str:
 
 
 def _convert_pdf(path: str) -> str:
-    import fitz  # PyMuPDF (lazy)
+    import pdf_inspector
+    result = pdf_inspector.process_pdf(path)
+
+    # Fast path: TextBased or Mixed - use markdown directly
+    if result.pdf_type in ("TextBased", "Mixed"):
+        if result.markdown:
+            return result.markdown
+
+    # Fallback for Scanned, ImageBased, or when markdown is None: use OCR
+    import fitz  # PyMuPDF (lazy, needed for rendering pages to images)
+    import pytesseract
+
     doc = fitz.open(path)
-    texts = [page.get_text() for page in doc]
+    texts = []
+    for page in doc:
+        pix = page.get_pixmap(dpi=300)
+        img = pix.tobytes("png")
+        text = pytesseract.image_to_string(img)
+        texts.append(text)
     doc.close()
     return "\n".join(texts)
 

@@ -78,12 +78,13 @@
 - accepts either local workspace path or `https://` URL
 - for URLs: validates SSRF, auto-detects format via docling (no need to derive extension)
 - for local files: enforces workspace boundary, blocks sensitive files (.env, .key, etc.)
+- for PDFs: uses `pdf-inspector` for smart classification (text vs scanned), extracts text-based PDFs locally (~200ms), routes scanned pages to `pytesseract` OCR
 - uses `docling.document_converter.DocumentConverter` with auto-detected formats
 - caches conversion results (LRU cache of 20 sources)
 - exports to Markdown with preserved formatting
 
 **Supported formats:**
-- PDF (including scanned with OCR)
+- PDF (text + scanned via pdf-inspector + pytesseract OCR)
 - Office: DOCX, PPTX, XLSX
 - Images: PNG, JPEG, TIFF, BMP, GIF, WEBP
 - Web: HTML, XML
