@@ -78,12 +78,22 @@ Despite the optimized version having more total tokens (due to caching), the act
 
 ## Connecting AI Coding Assistants
 
-See [AGENTS.md](AGENTS.md) for detailed configuration instructions for OpenCode, Claude Code, Cursor, Windsurf, Continue, Zed, Hermes Agent, and other MCP clients.
+LSS-MCP speaks the standard **Model Context Protocol (MCP)**. Any AI assistant with MCP support can use these tools.
 
-**Quick links:**
-- [Hermes Agent](AGENTS.md#hermes-agent) - add to `~/.hermes/config.yaml`
-- [OpenCode](AGENTS.md#opencode) - add to `opencode.json`
-- [Claude Code](AGENTS.md#claude-code) - `claude mcp add`
+**MCP-compatible (works out of the box):**
+- Hermes Agent — add to `~/.hermes/config.yaml`
+- OpenCode — add to `opencode.json`
+- Claude Code — `claude mcp add`
+- Cursor — Settings → MCP Server
+- Windsurf — command palette
+- Continue (VS Code) — settings.json
+- Zed — settings.json
+- Any other MCP client
+
+**Not compatible:**
+- OpenClaw — uses its own plugin system, not MCP
+
+See [AGENTS.md](AGENTS.md) for detailed configuration examples for each client.
 
 ## Using the Tools
 
