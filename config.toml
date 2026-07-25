@@ -27,9 +27,13 @@ max_requests_per_minute = 60
 [auth]
 enabled = false
 
-# LLM extraction (disabled by default - relies on external LLM key)
+# LLM extraction (enabled - requires API key)
 [llm]
-enabled = false
+enabled = true
+provider = "openai"
+base_url = "http://host.docker.internal:4000/v1"
+api_key = "YOUR_OPENAI_API_KEY_OR_LITELLM_KEY"
+model = "gpt-4o-mini"
 
 # Caching
 [cache]

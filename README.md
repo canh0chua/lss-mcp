@@ -9,7 +9,6 @@ Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCo
 - **read_webpage**: JavaScript-aware web scraping via CRW + LightPanda headless browser, returns clean Markdown
 - **web_crawl**: Crawl entire websites starting from a URL, returns Markdown for each page
 - **web_map**: Discover all pages on a website (sitemap discovery)
-- **web_extract**: Extract structured data from URLs using LLM extraction (when configured)
 - **read_document**: Parse documents (PDF, Office, images via OCR, HTML, CSV) into Markdown with caching using lightweight local libraries. Supports both local files and URLs.
 - **read_code_outline**: AST-based Python file outlining (functions/classes only) to save tokens before reading full files
 - **run_command_compressed**: Execute shell commands with truncated successful output; preserves full error traces
@@ -100,13 +99,13 @@ docker exec -i lss-mcp_support_server python /app/server.py
 
 ### Option 2: Via Firecrawl-compatible API (Built-in Hermes web tools only)
 
-Hermes Agent's native `web_search` and `web_extract` tools can use CRW directly as a **Firecrawl backend** — no MCP config needed. Point Hermes at CRW's Firecrawl-compatible API:
+Hermes Agent's native `web_search` tool can use CRW directly as a **Firecrawl backend** — no MCP config needed. Point Hermes at CRW's Firecrawl-compatible API:
 
 ```bash
 export FIRECRAWL_API_URL=http://localhost:3002
 ```
 
-This replaces Hermes' default cloud Firecrawl with your local CRW instance. The agent's `web_search` and `web_extract` tools work automatically (search routed through SearXNG via CRW, page scraping via LightPanda via CRW). Pair with SearXNG directly for search to use both backends independently (see AGENTS.md for split config).
+This replaces Hermes' default cloud Firecrawl with your local CRW instance. The agent's `web_search` tool works automatically (search routed through SearXNG via CRW, page scraping via LightPanda via CRW). Pair with SearXNG directly for search to use both backends independently (see AGENTS.md for split config).
 
 See [AGENTS.md](AGENTS.md) for detailed configuration examples for each option.
 
@@ -197,24 +196,6 @@ Useful for finding documentation pages, blog posts, or sitemap entries.
 **Example:**
 ```
 web_map("https://example.com")
-```
-
-### web_extract
-
-```
-Extract structured data from a URL using CRW's LLM extraction.
-Provide a URL and a natural-language prompt describing what to extract.
-```
-
-**Parameters:**
-- `url` (string): URL to extract data from
-- `prompt` (string): Natural-language description of what to extract
-
-**Returns:** Extracted JSON data
-
-**Example:**
-```
-web_extract(url="https://example.com/pricing", prompt="Extract all pricing tiers and their costs")
 ```
 
 ### read_document

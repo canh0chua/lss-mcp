@@ -247,7 +247,7 @@ async def web_search_crw(query: str) -> str:
             )
             data = resp.json()
             if resp.status_code == 200 and data.get("success"):
-                results = data.get("data", [])[:5]
+                results = data.get("data", {}).get("results", [])[:5]
                 clean = [
                     {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")}
                     for r in results
@@ -332,35 +332,7 @@ async def web_map(url: str, limit: int = 50) -> str:
         return f"Map failed: {str(e)}"
 
 
-@mcp.tool()
-async def web_extract(url: str, prompt: str) -> str:
-    """Extract structured data from a URL using CRW's LLM extraction.
 
-    Provide a URL and a natural-language prompt describing what to extract.
-    CRW will render the page and use an LLM to extract the requested data.
-
-    Example: extract(url="https://example.com/pricing", prompt="Extract all pricing tiers and their costs")
-    """
-    if len(url) > _MAX_URL_LEN:
-        return f"Error: URL exceeds maximum length of {_MAX_URL_LEN} characters."
-    try:
-        crw_url = os.getenv("CRW_URL", "http://crw:3000")
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{crw_url}/v1/extract",
-                json={"urls": [url], "prompt": prompt},
-            )
-            data = resp.json()
-            if resp.status_code == 200 and data.get("success"):
-                return json.dumps(data.get("data", {}), indent=2)[:8000]
-            return f"Extract failed: {data.get('error', str(data))}"
-    except httpx.RequestError as e:
-        return f"Extract failed: HTTP error connecting to CRW: {str(e)}"
-    except Exception as e:
-        return f"Extract failed: {str(e)}"
-
-
-@mcp.tool()
 def read_document(path_or_url: str) -> str:
     """
     Parse documents into Markdown using lightweight libraries.
