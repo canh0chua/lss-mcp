@@ -202,10 +202,11 @@ def web_search(query: str) -> str:
 
 
 @mcp.tool()
-async def read_webpage(url: str) -> str:
+async def web_extract_crw(url: str) -> str:
     """Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown.
     
     Uses CRW (Firecrawl-compatible API) for JS rendering and markdown extraction.
+    No LLM involved — pure browser rendering + DOM-to-markdown.
     Requires the 'crw' and 'lightpanda' services to be running.
     """
     if len(url) > _MAX_URL_LEN:
@@ -216,17 +217,17 @@ async def read_webpage(url: str) -> str:
             resp = await client.post(
                 f"{crw_url}/v1/scrape",
                 json={"url": url, "formats": ["markdown"]},
-                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
             )
             data = resp.json()
             if resp.status_code == 200 and data.get("success"):
                 return data["data"]["markdown"]
             error_msg = data.get("error", str(data))
-            return f"Failed to fetch webpage: {error_msg}"
+            return f"Failed to extract page content: {error_msg}"
     except httpx.RequestError as e:
-        return f"Failed to fetch webpage: HTTP error connecting to CRW: {str(e)}"
+        return f"Failed to extract page content: HTTP error connecting to CRW: {str(e)}"
     except Exception as e:
-        return f"Failed to fetch webpage: {str(e)}"
+        return f"Failed to extract page content: {str(e)}"
 
 
 @mcp.tool()

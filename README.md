@@ -6,7 +6,7 @@ Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCo
 
 - **web_search**: Private web search via local SearXNG instance
 - **web_search_crw**: Alternative search through CRW (Firecrawl-compatible API with SearXNG backend)
-- **read_webpage**: JavaScript-aware web scraping via CRW + LightPanda headless browser, returns clean Markdown
+- **web_extract_crw**: JavaScript-aware web scraping via CRW + LightPanda headless browser, returns clean Markdown (no LLM)
 - **web_crawl**: Crawl entire websites starting from a URL, returns Markdown for each page
 - **web_map**: Discover all pages on a website (sitemap discovery)
 - **read_document**: Parse documents (PDF, Office, images via OCR, HTML, CSV) into Markdown with caching using lightweight local libraries. Supports both local files and URLs.
