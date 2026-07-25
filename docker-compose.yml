@@ -83,7 +83,7 @@ services:
       - RUST_LOG=info
       - CRW_BIND_ADDRESS=0.0.0.0
       - CRW_HOST_PORT=3000
-      - CRW_SEARCH__PROVIDER=duckduckgo
+      - CRW_SEARCH__PROVIDER=searxng
       - CRW_SEARCH__SEARXNG_URL=http://searxng:8080
     volumes:
       - ./config.toml:/app/config.toml:ro
