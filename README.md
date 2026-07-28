@@ -1,17 +1,17 @@
 # LSS-MCP (Local Support Stack MCP)
 
-Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (4get, CRW/LightPanda, pdf-inspector, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs for tool calls.
+Self-hosted Docker stack that exposes a single MCP server to Claude Code, OpenCode, Cursor, and other AI coding assistants. Offloads web searching, JS-heavy scraping, and document parsing to local open-source tools (CRW/LightPanda, pdf-inspector, Tesseract) to provide clean Markdown, saving roughly 80% to 90% on API token costs for tool calls.
 
 ## Features
 
-- **web_search**: Private web search via local 4get instance (privacy-respecting proxy)
+- **web_search**: Private web search via multiple engines (Brave, DuckDuckGo, Google, Yandex, Startpage, Qwant) using CRW/LightPanda for reliable bot bypass
 - **web_extract_crw**: JavaScript-aware web scraping via CRW + LightPanda headless browser, returns clean Markdown (no LLM)
 - **web_crawl**: Crawl entire websites starting from a URL, returns Markdown for each page
 - **web_map**: Discover all pages on a website (sitemap discovery)
 - **read_document**: Parse documents (PDF, Office, images via OCR, HTML, CSV) into Markdown with caching using lightweight local libraries. Supports both local files and URLs.
 - **read_code_outline**: AST-based Python file outlining (functions/classes only) to save tokens before reading full files
 - **run_command_compressed**: Execute shell commands with truncated successful output; preserves full error traces
-- **compress_and_read_image**: Downscale and compress UI screenshots to reduce vision token costs (800px max, 60% JPEG quality)
+- **compress_and_read_image**: Downscale and compress large UI screenshots to reduce vision token costs (800px max, 60% JPEG quality)
 - **map_repository**: Token-optimized repository mapper with `.gitignore` support and configurable depth
 - **focused_glob**: Pattern-based file finder that auto-filters junk and caps results
 - **search_codebase**: Full-text search using SQLite FTS5 with BM25 ranking; precise token-efficient code searches
@@ -108,6 +108,17 @@ This replaces Hermes' default cloud Firecrawl with your local CRW instance. The 
 
 See [AGENTS.md](AGENTS.md) for detailed configuration examples for each option.
 
+### HTTP Search Gateway (Port 3003)
+
+The MCP server embeds an HTTP gateway that exposes SearXNG and 4get compatible endpoints for external tools:
+
+- **SearXNG-compatible**: `GET http://localhost:3003/search?q=query&format=json`
+- **4get-compatible**: `GET http://localhost:3003/api/v1/search?s=query`
+- **Health check**: `GET http://localhost:3003/healthz`
+
+This gateway is used by Hermes Agent's `web_search` plugin and by CRW for search delegation.
+It translates requests to the MCP server's internal multi-engine search (Brave, DuckDuckGo, Wikipedia).
+
 ## Using the Tools
 
 See [TOOLS.md](TOOLS.md) for complete tool reference with parameters and examples.
@@ -115,40 +126,32 @@ See [TOOLS.md](TOOLS.md) for complete tool reference with parameters and example
 ### web_search
 
 ```
-Search the web for real-time information
+Search the web using multiple engines (Brave, DuckDuckGo, Wikipedia).
+Supports web, image, video, news, music types.
 ```
 
 **Parameters:**
 - `query` (string): Search query
+- `type` (string, optional): Result type: web, image, video, news, music (default: web)
+- `limit` (integer, optional): Max results (default: 10, max: 20)
+- `scraper` (string, optional): Force a specific scraper engine
+- `npt` (string, optional): Next page token from a previous response
 
-**Returns:** JSON array of up to 5 results with `title`, `url`, and `snippet`
+**Returns:** JSON with `results` array, optional `spelling` corrections, and `npt` next page token
 
 **Example:**
 ```
 web_search("latest Python 3.13 release date")
+web_search("cat memes", type="image", limit=5)
 ```
 
-### web_search_crw
+### web_extract_crw
 
 ```
-Search the web via CRW (backed by SearXNG). Alternative to the local web_search.
-```
-
-**Parameters:**
-- `query` (string): Search query
-
-**Returns:** JSON array of up to 5 results with `title`, `url`, and `snippet`
-
-**Example:**
-```
-web_search_crw("latest AI research papers")
-```
-
-### read_webpage
-
-```
-Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown
-Uses CRW (Firecrawl-compatible) + LightPanda headless browser for JS rendering.
+Fetch a URL, execute JavaScript, strip HTML bloat, and return pure Markdown.
+Uses CRW (Firecrawl-compatible API) for JS rendering and markdown extraction.
+No LLM involved - pure browser rendering + DOM-to-markdown.
+Requires the 'crw' and 'lightpanda' services to be running.
 ```
 
 **Parameters:**
@@ -158,7 +161,7 @@ Uses CRW (Firecrawl-compatible) + LightPanda headless browser for JS rendering.
 
 **Example:**
 ```
-read_webpage("https://example.com/article")
+web_extract_crw("https://example.com/article")
 ```
 
 ### web_crawl
@@ -400,10 +403,16 @@ safe_read_file("large_file.py", force=True)
 
 ```
 lss-mcp/
-├── docker-compose.yml         # 4 services: fourget, lightpanda, crw, mcp-server
-├── Dockerfile                 # Lightweight Python image (~200MB vs 2GB+ with crawl4ai)
+├── docker-compose.yml         # 3 services: crw, lightpanda, mcp-server
+├── Dockerfile                 # Lightweight Python image (~200MB)
 ├── server.py                  # MCP server with 16+ tools
-├── gateway.py                 # SearXNG-compatible adapter for 4get (~20MB vs SearXNG's ~200MB)
+├── gateway.py               # 4get + SearXNG-compatible HTTP gateway (port 8081)
+├── lib/
+│   └── search/
+│       ├── __init__.py        # Scraper registry
+│       ├── searchapi.py       # FastAPI gateway exposing search endpoints
+│       ├── base.py            # Scraper base class & CRW client
+│       └── scrapers.py        # Engine-specific scrapers (Brave, DDG, Google, etc.)
 ├── config.toml                # CRW (Firecrawl-compatible) configuration
 ├── .dockerignore
 ├── .gitignore
@@ -411,11 +420,9 @@ lss-mcp/
 ├── docs/                      # Documentation
 │   ├── AGENTS.md              # AI assistant setup guide
 │   ├── ADVANCED.md            # Advanced configuration
+│   ├── LIGHTPANDA_MCP.md      # Lightpanda native MCP integration
 │   ├── TESTING.md             # Testing guide
-│   ├── TOOLS.md               # Tool reference
-│   ├── TOOLS_REFERENCE.md     # Detailed tool reference
 │   ├── TROUBLESHOOTING.md     # Troubleshooting guide
-│   └── WEB_SEARCH.md          # Web search documentation
 ├── certs/                     # Custom CA certificates (optional)
 └── logs/                      # Container logs
 ```
@@ -517,22 +524,13 @@ URL-based tools (`read_webpage`, `read_document`) enforce SSRF protection:
 | mcp-server | 512 MiB | Heavy libs (pdf-inspector, pytesseract, etc.) are lazy-loaded on first use |
 | CRW | 1 GiB | Browser rendering needs headroom |
 | LightPanda | 1 GiB | Headless browser |
-| 4get | unlimited | Lightweight, ~27 MiB typical |
 
-## Future Optimizations
-
-These are documented for potential future work:
-
-1. **Multi-stage Dockerfile** (~50-100 MiB image savings) - Build deps in a builder stage, copy only runtime artifacts
-2. **Drop unused apt packages** (~50 MiB) - `tesseract-ocr`, `wget`, `gnupg` are rarely used; move to optional extras
-3. **Reduce uvicorn workers** - Currently default worker count; single-worker mode sufficient for MCP stdio usage
-4. **Drop PyMuPDF** (~30-50 MiB loaded) - If PDF rendering isn't needed in MCP server (CRW handles web scraping), remove `pymupdf` from Dockerfile
-5. **Switch to Alpine base image** - `python:3.11-alpine` instead of `python:3.11-slim` for smaller footprint
+## Service Ports
 
 | Service | Host Port | Container Port | Access |
 |---------|-----------|----------------|--------|
-| MCP Server (+ SearXNG gateway on :8080) | 3003 | 8080 | Localhost only |
-| 4get | 3004 | 80 | Localhost only |
+| Gateway (4get + SearXNG-compatible) | 3003 | 8081 | Localhost only |
+| MCP Server (stdio via docker exec) | 3004 | 8080 | Localhost only |
 | CRW (Firecrawl API) | 3002 | 3000 | Localhost only |
 | LightPanda | - | 9222 | Internal only |
 
@@ -545,5 +543,4 @@ View real-time logs:
 ```bash
 docker logs -f lss-mcp_support_server
 docker logs -f lss-mcp_crw
-docker logs -f lss-mcp_fourget
 ```

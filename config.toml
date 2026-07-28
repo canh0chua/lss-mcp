@@ -4,7 +4,7 @@ host_port = 3000
 
 [search]
 provider = "searxng"
-searxng_url = "http://mcp-server:8080"
+searxng_url = "http://mcp-server:8081"
 
 [renderer]
 mode = "lightpanda"

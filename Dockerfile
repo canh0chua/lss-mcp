@@ -35,6 +35,8 @@ RUN pip install --no-cache-dir \
     fastapi \
     "uvicorn[standard]"
 
-COPY server.py gateway.py ./
+COPY server.py /app/server.py
+COPY gateway.py /app/gateway.py
+COPY lib/search/ /app/lib/search/
 
 ENTRYPOINT ["python", "/app/server.py"]

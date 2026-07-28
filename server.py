@@ -17,9 +17,8 @@ import pathspec
 import glob
 from functools import lru_cache
 from urllib.parse import urlparse
-from mcp.server.fastmcp import FastMCP
+from mcp.server import FastMCP
 import httpx
-import tempfile
 
 # --- Heavy libraries: lazy-loaded inside functions that need them ---
 # fitz (PyMuPDF), docx, Presentation (python-pptx), openpyxl,
@@ -151,24 +150,14 @@ def _validate_searxng_url(url: str) -> str:
     if not parsed.netloc:
         raise ValueError("SEARXNG_URL is missing a host.")
     return url
-def _validate_fourget_url(url: str) -> str:
-    """Validate the 4get base URL (localhost is explicitly allowed)."""
-    if len(url) > _MAX_URL_LEN:
-        raise ValueError("FOURGET_URL exceeds maximum allowed length.")
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"FOURGET_URL has unsupported scheme '{parsed.scheme}'.")
-    if not parsed.netloc:
-        raise ValueError("FOURGET_URL is missing a host.")
-    return url
 
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-def web_search(query: str, type: str = "web", limit: int = 10, npt: str = "", scraper: str = "", nsfw: bool = False, country: str = "", lang: str = "", time_min: int = 0, time_max: int = 0) -> str:
-    """Search the web using 4get (privacy-respecting proxy). Returns JSON results.
+async def web_search(query: str, type: str = "web", limit: int = 10, npt: str = "", scraper: str = "", nsfw: bool = False, country: str = "", lang: str = "", time_min: int = 0, time_max: int = 0) -> str:
+    """Search the web using CRW scrapers. Returns JSON results.
 
     Supported types:
       - web: general web results (title, url, snippet)
@@ -181,93 +170,55 @@ def web_search(query: str, type: str = "web", limit: int = 10, npt: str = "", sc
     """
     if len(query) > _MAX_QUERY_LEN:
         return f"Error: query exceeds maximum length of {_MAX_QUERY_LEN} characters."
-    try:
-        raw_url = os.getenv("FOURGET_URL", "http://localhost:8081")
-        fourget_url = _validate_fourget_url(raw_url)
-    except ValueError as e:
-        return f"Configuration error: {e}"
 
-    # Map type to 4get API endpoint and result key
-    endpoint_map = {
-        "web":    ("/api/v1/web",    "web"),
-        "image":  ("/api/v1/images", "image"),
-        "video":  ("/api/v1/videos", "video"),
-        "news":   ("/api/v1/news",   "news"),
-        "music":  ("/api/v1/music",  "song"),
+    # Map type to result key
+    type_map = {
+        "web": "web",
+        "image": "image",
+        "video": "video",
+        "news": "news",
+        "music": "song",
     }
+    if type not in type_map:
+        return f"Invalid type '{type}'. Supported: {', '.join(type_map.keys())}"
 
-    if type not in endpoint_map:
-        return f"Invalid type '{type}'. Supported: {', '.join(endpoint_map.keys())}"
-
-    endpoint, result_key = endpoint_map[type]
+    result_key = type_map[type]
     limit = max(1, min(limit, 20))
 
     try:
-        params = {}
-        if npt:
-            params["npt"] = npt
-        else:
-            params["s"] = query
-        if scraper:
-            params["scraper"] = scraper
-        if nsfw:
-            params["nsfw"] = "1"
-        if country:
-            params["country"] = country
-        if lang:
-            params["lang"] = lang
-        if time_min:
-            params["time_min"] = time_min
-        if time_max:
-            params["time_max"] = time_max
-        if country:
-            params["country"] = country
-        if lang:
-            params["lang"] = lang
-        if time_min:
-            params["time_min"] = time_min
-        if time_max:
-            params["time_max"] = time_max
-        if scraper:
-            params["scraper"] = scraper
-        if nsfw:
-            params["nsfw"] = "1"
-        if country:
-            params["country"] = country
-        if lang:
-            params["lang"] = lang
-        if time_min:
-            params["time_min"] = time_min
-        if time_max:
-            params["time_max"] = time_max
-        if country:
-            params["country"] = country
-        if lang:
-            params["lang"] = lang
-        if time_min:
-            params["time_min"] = time_min
-        if time_max:
-            params["time_max"] = time_max
-        if npt:
-            params["npt"] = npt
-        else:
-            params["s"] = query
+        from lib.search import get_scraper, unified_search
 
-        resp = requests.get(
-            f"{fourget_url}{endpoint}",
-            params=params,
-            timeout=15
-        )
-        data = resp.json()
-        if data.get("status") != "ok":
-            return f"Search failed: 4get returned status '{data.get('status', 'unknown')}'"
+        # Determine scraper order: if scraper specified, use only that; otherwise use unified search
+        if scraper:
+            scraper_names = [scraper]
+            last_error = None
+            for sc_name in scraper_names:
+                try:
+                    scraper_cls = get_scraper(sc_name)
+                    instance = scraper_cls()
+                    result = await instance.search(query)
 
-        # Build compact output per type
+                    if result.get("status") == "ok" and len(result.get("web", [])) > 0:
+                        # Found results, break out
+                        break
+                    else:
+                        last_error = f"Scraper {sc_name} returned no results or bad status"
+                except Exception as e:
+                    last_error = f"Scraper {sc_name} failed: {e}"
+            else:
+                # If we didn't break, all scrapers failed
+                return f"Search failed. All scrapers failed. Last error: {last_error}"
+        else:
+            # Use unified search - parallel Brave+DDG+random extra, merged+ranked
+            result = await unified_search(query, limit=limit)
+            return json.dumps(result)
+
+        # Build compact output per type, respecting limit
+        raw = result.get(result_key, [])[:limit]
+        out = []
         if type == "web":
-            raw = data.get(result_key, [])[:limit]
             out = [{"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")} for r in raw]
         elif type == "image":
-            raw = data.get(result_key, [])[:limit]
             out = []
             for r in raw:
                 sources = r.get("source", [])
@@ -275,28 +226,25 @@ def web_search(query: str, type: str = "web", limit: int = 10, npt: str = "", sc
                 full = sources[0].get("url", "") if sources else ""
                 out.append({"title": r.get("title", ""), "url": full, "thumbnail": thumb})
         elif type == "video":
-            raw = data.get(result_key, [])[:limit]
             out = [{"title": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", ""), "duration": r.get("time", ""), "views": r.get("views", "")} for r in raw]
         elif type == "news":
-            raw = data.get(result_key, [])[:limit]
             out = [{"title": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", ""), "date": r.get("date"), "source": r.get("source", "")} for r in raw]
         elif type == "music":
-            raw = data.get(result_key, [])[:limit]
             out = [{"title": r.get("title", ""), "artist": r.get("artist", ""), "album": r.get("album", ""), "duration": r.get("time", "")} for r in raw]
 
+        final = {"results": out}
         # Include spelling correction if available (web only)
-        result = {"results": out}
         if type == "web":
-            spelling = data.get("spelling", {})
+            spelling = result.get("spelling", {})
             if spelling.get("type") != "no_correction":
-                result["spelling"] = spelling
+                final["spelling"] = spelling
         # Include next page token if available
-        if data.get("npt"):
-            result["npt"] = data["npt"]
+        if result.get("npt"):
+            final["npt"] = result["npt"]
 
-        return json.dumps(result)
+        return json.dumps(final)
     except Exception as e:
-        return f"Search failed. Ensure 4get is running. Error: {str(e)}"
+        return f"Search failed. Ensure CRW scrapers are available. Error: {str(e)}"
 
 
 @mcp.tool()
@@ -1156,38 +1104,13 @@ def safe_read_file(file_path: str, force: bool = False) -> str:
 
 
 # ---------------------------------------------------------------------------
-# SearXNG-to-4get Gateway (embedded HTTP server)
+# Embedded HTTP gateway (4get + SearXNG-compatible /search)
+# Runs on GATEWAY_BIND port (default 8081, exposed to host as 3003)
+# alongside MCP stdio (port 8080, host 3004).
 # ---------------------------------------------------------------------------
-# Starts a FastAPI gateway on port 8080 inside the MCP server container.
-# CRW connects here thinking it's talking to SearXNG; we translate to 4get.
 
-def _start_gateway():
-    """Run the gateway FastAPI server in a daemon thread."""
-    import uvicorn
-    from gateway import gateway_app, FOURGET_URL as _  # noqa: F811
-
-    # Set FOURGET_URL in the gateway module
-    import gateway
-    gateway.FOURGET_URL = os.getenv("FOURGET_URL", "http://localhost:80")
-
-    logging.getLogger("gateway").info(
-        "Starting SearXNG-to-4get gateway on 0.0.0.0:8080 (backend: %s)",
-        gateway.FOURGET_URL,
-    )
-    config = uvicorn.Config(
-        gateway.gateway_app,
-        host="0.0.0.0",
-        port=8080,
-        log_level="warning",
-        access_log=False,
-    )
-    server = uvicorn.Server(config)
-    server.run()
-
-
-# Start gateway in a background daemon thread so it doesn't block MCP stdio
-_gateway_thread = threading.Thread(target=_start_gateway, daemon=True, name="gateway")
-_gateway_thread.start()
+import gateway
+gateway.start_gateway_thread(web_search)
 
 
 if __name__ == "__main__":

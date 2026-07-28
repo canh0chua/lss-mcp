@@ -6,7 +6,8 @@ Common issues and solutions for LSS-MCP.
 
 - Check the mcp-server is running: `docker logs lss-mcp_support_server`
 - Wait 30 seconds after first startup for the adapter to initialize
-- Port 3003 should be mapped: `docker ps` shows `0.0.0.0:3003->3003/tcp`
+- Verify ports: `docker ps` should show `0.0.0.0:3003->8081/tcp` (gateway) and `0.0.0.0:3004->8080/tcp` (MCP)
+- Test gateway: `curl http://localhost:3003/healthz`
 
 ## "Failed to fetch webpage"
 

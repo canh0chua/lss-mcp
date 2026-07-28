@@ -1,37 +1,35 @@
 """
-SearXNG-compatible Gateway for 4get (embedded in MCP server container)
+4get + SearXNG-compatible HTTP gateway.
 
-Exposes a SearXNG-compatible API on port 8080 and translates requests to the
-4get API. CRW and other clients that expect SearXNG connect here seamlessly.
-
-Why this exists instead of running SearXNG:
-- ~20MB image vs ~200MB+ SearXNG container
-- No upstream engine CAPTCHAs or blocked requests (4get handles that upstream)
-- 4get is already deployed and maintained in this stack
-- Single container to manage instead of two
-
-Started by server.py via start_gateway_thread().
+Can run standalone (python gateway.py) or be started as a daemon thread
+from server.py via start_gateway_thread().
 """
-
+import json
 import logging
+import os
 from urllib.parse import urlparse
+from typing import Any, Callable, Dict, List, Optional
+
 import httpx
+import uvicorn
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger("gateway")
 
-FOURGET_URL = None  # Set at startup from env
-gateway_app = FastAPI(title="SearXNG-to-4get Gateway", version="1.0.0")
+FOURGET_URL: Optional[str] = None
+_internal_search: Optional[Callable] = None  # set by server.py
+
+gateway_app = FastAPI(title="4get+SearXNG Gateway", version="2.0.0")
 
 
-class SearchResult(BaseModel):
-    url: str
-    title: str
-    content: str
-    engine: str = "4get"
+# ── SearXNG models ──────────────────────────────────────────
+class SearXNGResult(BaseModel):
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    engine: str = "internal"
     template: str = "default.html"
     parsed_url: List[str] = Field(default_factory=list)
     engines: List[str] = Field(default_factory=list)
@@ -40,10 +38,10 @@ class SearchResult(BaseModel):
     category: str = "general"
 
 
-class SearchResponse(BaseModel):
+class SearXNGResponse(BaseModel):
     query: str
     number_of_results: int = 0
-    results: List[SearchResult] = Field(default_factory=list)
+    results: List[SearXNGResult] = Field(default_factory=list)
     answers: List[Any] = Field(default_factory=list)
     corrections: List[Any] = Field(default_factory=list)
     infoboxes: List[Any] = Field(default_factory=list)
@@ -51,47 +49,48 @@ class SearchResponse(BaseModel):
     unresponsive_engines: List[List[str]] = Field(default_factory=list)
 
 
-def parse_url(url: str) -> List[str]:
+def _parse_url(u: str) -> List[str]:
     try:
-        parsed = urlparse(url)
-        return [parsed.scheme, parsed.netloc, parsed.path, parsed.query, parsed.fragment]
+        p = urlparse(u)
+        return [p.scheme, p.netloc, p.path, p.query, p.fragment]
     except Exception:
         return ["", "", "", "", ""]
 
 
-def fourget_to_searxng(fourget_data: Dict[str, Any], query: str) -> SearchResponse:
+def _fourget_to_searxng(raw: Dict[str, Any], original_query: str) -> SearXNGResponse:
     results = []
-    raw_results = fourget_data.get("web", [])[:20]  # 4get uses "web" key
-
-    for i, item in enumerate(raw_results, 1):
-        url = item.get("url", "")
-        title = item.get("title", "")
-        snippet = item.get("description", "")  # 4get uses "description"
-
-        result = SearchResult(
-            url=url,
-            title=title,
-            content=snippet,
-            parsed_url=parse_url(url),
+    items = raw.get("web", [])[:20]
+    for i, item in enumerate(items, 1):
+        results.append(SearXNGResult(
+            url=item.get("url", ""),
+            title=item.get("title", ""),
+            content=item.get("description", ""),
+            parsed_url=_parse_url(item.get("url", "")),
             positions=[i],
             category="general",
-        )
-        results.append(result)
-
-    return SearchResponse(
-        query=query,
+        ))
+    return SearXNGResponse(
+        query=original_query,
         number_of_results=len(results),
         results=results,
     )
 
 
+async def _do_search(query: str) -> Dict[str, Any]:
+    if _internal_search is None:
+        return {"status": "error", "web": [], "message": "Search backend not ready"}
+    raw = await _internal_search(query=query, type="web", limit=20)
+    return json.loads(raw)
+
+
+# ── Routes ──────────────────────────────────────────────────
 @gateway_app.get("/healthz")
 async def health():
     return {"status": "ok"}
 
 
 @gateway_app.get("/search")
-async def search(
+async def searxng_search(
     request: Request,
     q: str = Query(..., alias="q"),
     format: str = Query("json", alias="format"),
@@ -104,41 +103,54 @@ async def search(
     sortby: Optional[str] = Query(None),
 ):
     try:
-        params = {"s": q}
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(f"{FOURGET_URL}/api/v1/web", params=params)
-            if resp.status_code != 200:
-                logger.error("4get returned %d: %s", resp.status_code, resp.text)
-                return JSONResponse(
-                    status_code=502,
-                    content={"error": f"Backend search failed with status {resp.status_code}"},
-                )
-
-            fourget_data = resp.json()
-            if fourget_data.get("status") != "ok":
-                logger.error("4get returned error status: %s", fourget_data.get("status"))
-                return JSONResponse(
-                    status_code=502,
-                    content={"error": f"Backend search failed: {fourget_data.get('status')}"},
-                )
-
-            searxng_resp = fourget_to_searxng(fourget_data, q)
-            return searxng_resp.model_dump()
-
-    except httpx.RequestError as e:
-        logger.error("HTTP error connecting to 4get: %s", e)
-        return JSONResponse(
-            status_code=502,
-            content={"error": f"Cannot connect to search backend: {str(e)}"},
-        )
+        data = await _do_search(q)
     except Exception as e:
-        logger.error("Unexpected error: %s", e, exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Internal server error: {str(e)}"},
-        )
+        logger.error("search failed: %s", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    return _fourget_to_searxng(data, q).model_dump()
 
 
-@gateway_app.get("/autocomplete")
-async def autocomplete(q: str = Query(..., alias="q")):
-    return {"suggestions": []}
+@gateway_app.get("/api/v1/search")
+async def fourget_search(
+    request: Request,
+    s: str = Query(..., alias="s"),
+    scraper: Optional[str] = Query(None),
+    nsfw: bool = Query(False),
+    npt: Optional[str] = Query(None),
+):
+    try:
+        data = await _do_search(s)
+    except Exception as e:
+        logger.error("search failed: %s", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    return {
+        "status": "ok",
+        "web": data.get("web", data.get("results", [])),
+        "npt": data.get("npt"),
+    }
+
+
+# ── Standalone entry point ──────────────────────────────────
+def start_gateway_thread(search_fn: Callable):
+    """Start the gateway as a daemon thread. Called by server.py."""
+    _globals = globals()
+    _globals["_internal_search"] = search_fn
+
+    def _run():
+        bind = os.getenv("GATEWAY_BIND", "0.0.0.0:8080")
+        host, port = bind.split(":")
+        logger.info("Gateway on %s:%s", host, port)
+        uvicorn.run(gateway_app, host=host, port=int(port), log_level="warning", access_log=False)
+
+    import threading
+    t = threading.Thread(target=_run, daemon=True, name="gateway")
+    t.start()
+    return t
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    bind = os.getenv("GATEWAY_BIND", "0.0.0.0:8080")
+    host, port = bind.split(":")
+    logger.info("Gateway standalone on %s:%s", host, port)
+    uvicorn.run(gateway_app, host=host, port=int(port), log_level="info")

@@ -19,23 +19,15 @@ If your network uses a MITM proxy (e.g., Zscaler, Netskope, Palo Alto), you need
 That's it. The certificates are automatically trusted by:
 - Python (`requests`, `httpx`, `urllib`) via `SSL_CERT_FILE`
 - Playwright/Chromium via `NODE_EXTRA_CA_CERTS`
-- 4get adapter's outbound search queries via `REQUESTS_CA_BUNDLE`
 - All system-level TLS via `update-ca-certificates`
 
 The `certs/` directory is gitignored — your certificates stay local.
 
-## Search Backend (SearXNG-to-4get Adapter)
+## Search Backend (CRW Scrapers)
 
-The search adapter runs inside the `mcp-server` container and translates SearXNG-compatible API requests to the 4get search backend. No separate SearXNG container is needed.
+The `web_search` tool uses direct CRW-based scrapers for full-text search capabilities. This architecture is lightweight and reliable, avoiding the CAPTCHA blocks and anti-bot failures that traditional search aggregators frequently encounter.
 
-**Why 4get over SearXNG?**
-- **Memory**: ~20MB (4get adapter) vs ~200MB (SearXNG container) — 10× lighter
-- **Reliability**: 4get proxies directly through frontend scrapers; no engine CAPTCHA blocks or anti-bot failures that SearXNG search engines frequently hit
-
-If SearXNG is needed as an emergency fallback, it is available commented out in `docker-compose.yml` on port 3005. To start it:
-```bash
-docker compose --profile fallback up -d searxng
-```
+The search adapter runs inside the `mcp-server` container and executes queries directly through various backend engines (ddg, brave, yandex, google, qwant, startpage, etc.) via the CRW infrastructure.
 
 After changes, restart: `docker compose restart mcp-server`
 
